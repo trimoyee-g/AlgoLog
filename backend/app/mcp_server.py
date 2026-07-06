@@ -14,110 +14,69 @@ Run:
 Then point Claude Desktop's config at this script (see README for the
 claude_desktop_config.json snippet).
 """
-import asyncio
 import os
+from typing import Annotated
 
 import httpx
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 API_KEY = os.environ.get("API_KEY", "change-me-to-something-random")
 
-server = Server("algolog")
+mcp = FastMCP("algolog")
 
 
-@server.list_tools()
-async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="get_weak_problems",
-            description="Get problems the user rated as difficult (rating >= threshold) or could not solve themselves.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "min_rating": {"type": "integer", "description": "Minimum self-rated difficulty, 1-5", "default": 4},
-                    "solved_self": {"type": "boolean", "description": "Filter to only problems NOT solved unaided", "default": False},
-                    "platform": {"type": "string", "description": "leetcode | codeforces | codechef | atcoder | gfg"},
-                },
-            },
-        ),
-        Tool(
-            name="get_similar_problems",
-            description="Given free-text describing a problem (title + short description), find similar problems from the user's own history via embedding similarity - useful to check 'have I seen something like this before'.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string", "description": "Problem title and/or short description"},
-                    "limit": {"type": "integer", "default": 5},
-                },
-                "required": ["text"],
-            },
-        ),
-        Tool(
-            name="get_stats_overview",
-            description="Get overall practice stats: total problems, total attempts, solved-unaided count, hard-rated count.",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="predict_difficulty",
-            description="Predict how hard THIS user will personally find a new problem, based on their trained calibration model.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "platform": {"type": "string"},
-                    "official_difficulty": {"type": "string"},
-                    "tags": {"type": "string"},
-                },
-                "required": ["platform"],
-            },
-        ),
-    ]
+async def _get(path: str, **params) -> str:
+    async with httpx.AsyncClient(timeout=30.0, headers={"X-API-Key": API_KEY}) as client:
+        clean = {k: v for k, v in params.items() if v is not None}
+        return (await client.get(f"{BACKEND_URL}{path}", params=clean)).text
 
 
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    headers = {"X-API-Key": API_KEY}
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        if name == "get_weak_problems":
-            params = {}
-            if arguments.get("min_rating") is not None:
-                params["min_rating"] = arguments["min_rating"]
-            if "solved_self" in arguments:
-                params["solved_self"] = str(arguments["solved_self"]).lower()
-            if arguments.get("platform"):
-                params["platform"] = arguments["platform"]
-            resp = await client.get(f"{BACKEND_URL}/api/problems", params=params)
-            return [TextContent(type="text", text=resp.text)]
-
-        if name == "get_similar_problems":
-            params = {"text": arguments["text"], "limit": arguments.get("limit", 5)}
-            resp = await client.get(f"{BACKEND_URL}/api/problems/search-similar-text", params=params)
-            return [TextContent(type="text", text=resp.text)]
-
-        if name == "get_stats_overview":
-            resp = await client.get(f"{BACKEND_URL}/api/stats/overview")
-            return [TextContent(type="text", text=resp.text)]
-
-        if name == "predict_difficulty":
-            resp = await client.post(
-                f"{BACKEND_URL}/api/calibration/predict",
-                json={
-                    "platform": arguments["platform"],
-                    "official_difficulty": arguments.get("official_difficulty"),
-                    "tags": arguments.get("tags"),
-                },
-            )
-            return [TextContent(type="text", text=resp.text)]
-
-        return [TextContent(type="text", text=f"Unknown tool: {name}")]
+@mcp.tool()
+async def get_weak_problems(
+    min_rating: Annotated[int, Field(description="Minimum self-rated difficulty, 1-5")] = 4,
+    solved_self: Annotated[bool, Field(description="Filter to only problems NOT solved unaided")] = False,
+    platform: Annotated[str | None, Field(description="leetcode | codeforces | codechef | atcoder | gfg")] = None,
+) -> str:
+    """Get problems the user rated as difficult (rating >= threshold) or could not solve themselves."""
+    return await _get(
+        "/api/problems",
+        min_rating=min_rating,
+        solved_self=str(solved_self).lower(),
+        platform=platform,
+    )
 
 
-async def main():
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+@mcp.tool()
+async def get_similar_problems(
+    text: Annotated[str, Field(description="Problem title and/or short description")],
+    limit: int = 5,
+) -> str:
+    """Given free-text describing a problem, find similar problems from the user's own history via embedding similarity - useful to check 'have I seen something like this before'."""
+    return await _get("/api/problems/search-similar-text", text=text, limit=limit)
+
+
+@mcp.tool()
+async def get_stats_overview() -> str:
+    """Get overall practice stats: total problems, total attempts, solved-unaided count, hard-rated count."""
+    return await _get("/api/stats/overview")
+
+
+@mcp.tool()
+async def predict_difficulty(
+    platform: str,
+    official_difficulty: str | None = None,
+    tags: str | None = None,
+) -> str:
+    """Predict how hard THIS user will personally find a new problem, based on their trained calibration model."""
+    async with httpx.AsyncClient(timeout=30.0, headers={"X-API-Key": API_KEY}) as client:
+        resp = await client.post(
+            f"{BACKEND_URL}/api/calibration/predict",
+            json={"platform": platform, "official_difficulty": official_difficulty, "tags": tags},
+        )
+        return resp.text
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()
