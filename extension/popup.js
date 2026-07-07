@@ -1,7 +1,6 @@
-const BACKEND_URL = "http://localhost:8000";
-
 let rating = 0;
 let solvedSelf = null;
+let accessToken = null;
 
 document.querySelectorAll("#stars span").forEach((star) => {
   star.addEventListener("click", () => {
@@ -26,8 +25,24 @@ function guessPlatform(url) {
   if (url.includes("codechef.com")) return "codechef";
   if (url.includes("atcoder.jp")) return "atcoder";
   if (url.includes("geeksforgeeks.org")) return "gfg";
-  return "leetcode";
+  return "other";
 }
+
+function showLoggedOut() {
+  document.getElementById("loggedOut").classList.remove("hidden");
+  document.getElementById("rating").classList.add("hidden");
+}
+
+function showRating() {
+  document.getElementById("rating").classList.remove("hidden");
+  document.getElementById("loggedOut").classList.add("hidden");
+}
+
+document.getElementById("loginBtn").addEventListener("click", () => {
+  openLogin();
+  document.getElementById("loginHint").textContent =
+    "After you log in, reopen this popup — it'll unlock automatically.";
+});
 
 document.getElementById("save").addEventListener("click", async () => {
   const statusEl = document.getElementById("status");
@@ -35,49 +50,57 @@ document.getElementById("save").addEventListener("click", async () => {
     statusEl.textContent = "Pick a rating and yes/no first.";
     return;
   }
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tags = document.getElementById("tags").value.trim();
+  if (!tags) {
+    statusEl.textContent = "Add at least one tag — that's what powers 'find similar'.";
+    return;
+  }
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   const notes = document.getElementById("notes").value;
+  const title = document.getElementById("title").value.trim() || tab.title;
 
-  chrome.storage.sync.get(["apiKey"], async (result) => {
-    const apiKey = result.apiKey || "change-me-to-something-random";
-    try {
-      const resp = await fetch(`${BACKEND_URL}/api/attempts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-        body: JSON.stringify({
-          url: tab.url.split("?")[0],
-          title: tab.title,
-          platform: guessPlatform(tab.url),
-          official_difficulty: null,
-          tags: "",
-          description_snippet: tab.title,
-          rating,
-          solved_self: solvedSelf,
-          notes,
-        }),
-      });
-      if (resp.ok) {
-        statusEl.textContent = "Saved ✓";
-      } else {
-        statusEl.textContent = "Backend error - check it's running.";
-      }
-    } catch (e) {
-      statusEl.textContent = "Backend unreachable at localhost:8000.";
+  try {
+    const resp = await fetch(`${BACKEND_URL}/api/attempts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        url: tab.url.split("?")[0],
+        title,
+        platform: guessPlatform(tab.url),
+        official_difficulty: null,
+        tags,
+        description_snippet: tab.title,
+        rating,
+        solved_self: solvedSelf,
+        notes,
+      }),
+    });
+    if (resp.ok) {
+      statusEl.textContent = "Saved ✓";
+    } else if (resp.status === 401) {
+      // token rejected/expired mid-session -> back to login
+      await api.storage.local.remove("session");
+      statusEl.textContent = "Session expired — please log in again.";
+      showLoggedOut();
+    } else {
+      statusEl.textContent = "Backend error - check it's running.";
     }
-  });
+  } catch (e) {
+    statusEl.textContent = "Backend unreachable at localhost:8000.";
+  }
 });
 
-document.getElementById("settingsToggle").addEventListener("click", () => {
-  const panel = document.getElementById("settingsPanel");
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
-  chrome.storage.sync.get(["apiKey"], (result) => {
-    document.getElementById("apiKeyInput").value = result.apiKey || "";
-  });
-});
-
-document.getElementById("saveKey").addEventListener("click", () => {
-  const val = document.getElementById("apiKeyInput").value;
-  chrome.storage.sync.set({ apiKey: val }, () => {
-    document.getElementById("status").textContent = "API key saved.";
-  });
-});
+// On open: decide which view to show based on a valid session.
+(async () => {
+  accessToken = await getAccessToken();
+  if (accessToken) {
+    showRating();
+    const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+    if (tab?.title) document.getElementById("title").value = tab.title;
+  } else {
+    showLoggedOut();
+  }
+})();

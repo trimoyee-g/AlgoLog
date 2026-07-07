@@ -25,21 +25,21 @@ def find_similar(problem_id: int, limit: int = 5, db: Session = Depends(get_db),
     if not target or target.embedding is None:
         return []
 
+    dist = Problem.embedding.cosine_distance(target.embedding)
     results = (
-        db.query(Problem)
+        db.query(Problem, dist.label("distance"))
         .filter(Problem.user_id == user_id)
         .filter(Problem.id != problem_id)
         .filter(Problem.embedding.isnot(None))
-        .order_by(Problem.embedding.cosine_distance(target.embedding))
+        .order_by(dist)
         .limit(limit)
         .all()
     )
 
     out = []
-    for p in results:
+    for p, distance in results:
         latest = max(p.attempts, key=lambda a: a.created_at) if p.attempts else None
         # cosine_distance = 1 - cosine_similarity, so convert back for a friendlier number
-        distance = db.query(Problem.embedding.cosine_distance(target.embedding)).filter(Problem.id == p.id).scalar()
         similarity = 1 - float(distance) if distance is not None else 0.0
         out.append(SimilarProblemOut(
             id=p.id,
@@ -63,18 +63,18 @@ def search_similar_by_text(text: str, limit: int = 5, db: Session = Depends(get_
     to warn you upfront: 'this looks like problem X you rated 4/5 before'.
     """
     query_embedding = embed_text(text)
+    dist = Problem.embedding.cosine_distance(query_embedding)
     results = (
-        db.query(Problem)
+        db.query(Problem, dist.label("distance"))
         .filter(Problem.user_id == user_id)
         .filter(Problem.embedding.isnot(None))
-        .order_by(Problem.embedding.cosine_distance(query_embedding))
+        .order_by(dist)
         .limit(limit)
         .all()
     )
     out = []
-    for p in results:
+    for p, distance in results:
         latest = max(p.attempts, key=lambda a: a.created_at) if p.attempts else None
-        distance = db.query(Problem.embedding.cosine_distance(query_embedding)).filter(Problem.id == p.id).scalar()
         similarity = 1 - float(distance) if distance is not None else 0.0
         out.append(SimilarProblemOut(
             id=p.id,

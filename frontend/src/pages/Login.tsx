@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 
-function signIn(provider: "google" | "github") {
+function signInWithGitHub() {
   supabase.auth.signInWithOAuth({
-    provider,
-    // After the provider redirects back, Supabase parses the session and we land on /app.
+    provider: "github",
+    // After GitHub redirects back, Supabase parses the session and we land on /app.
     options: { redirectTo: `${window.location.origin}/app` },
   });
 }
@@ -19,11 +19,8 @@ export default function Login() {
         <p className="mt-2 text-sm text-muted-foreground">
           Your practice log is private to your account.
         </p>
-        <div className="mt-6 flex flex-col gap-3">
-          <Button size="lg" onClick={() => signIn("google")}>
-            Continue with Google
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => signIn("github")}>
+        <div className="mt-6">
+          <Button size="lg" className="w-full" onClick={signInWithGitHub}>
             <Github className="mr-2 h-4 w-4" />
             Continue with GitHub
           </Button>

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Reveal } from "@/components/motion/Reveal";
 import { GlowOrb } from "@/components/motion/ParallaxLayer";
-import { getOverview, listProblems, sendDigestNow, trainCalibration } from "@/lib/api";
+import { getOverview, listProblems, sendDigestNow } from "@/lib/api";
 import type { ProblemFilters } from "@/lib/types";
 
 const emptyDraft: FilterDraft = {
@@ -48,18 +48,6 @@ export default function Dashboard() {
   const problemsQuery = useQuery({
     queryKey: ["problems", appliedFilters],
     queryFn: () => listProblems(appliedFilters),
-  });
-
-  const trainMutation = useMutation({
-    mutationFn: trainCalibration,
-    onSuccess: (data) => {
-      if (data.trained) {
-        toast.success(`Model trained on ${data.samples_used} attempts.`);
-      } else {
-        toast.info(data.reason ?? "Not enough data yet.");
-      }
-    },
-    onError: (err: Error) => toast.error(`Training failed: ${err.message}`),
   });
 
   const digestMutation = useMutation({
@@ -145,9 +133,7 @@ export default function Dashboard() {
                   setAppliedFilters(draftToFilters(draft));
                   queryClient.invalidateQueries({ queryKey: ["problems"] });
                 }}
-                onTrain={() => trainMutation.mutate()}
                 onDigest={() => digestMutation.mutate()}
-                trainPending={trainMutation.isPending}
                 digestPending={digestMutation.isPending}
               />
             </Reveal>

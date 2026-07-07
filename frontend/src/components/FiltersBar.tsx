@@ -1,4 +1,4 @@
-import { Filter, Sparkles, Mail } from "lucide-react";
+import { Filter, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,9 +21,7 @@ interface FiltersBarProps {
   draft: FilterDraft;
   onChange: (draft: FilterDraft) => void;
   onApply: () => void;
-  onTrain: () => void;
   onDigest: () => void;
-  trainPending: boolean;
   digestPending: boolean;
 }
 
@@ -31,9 +29,7 @@ export function FiltersBar({
   draft,
   onChange,
   onApply,
-  onTrain,
   onDigest,
-  trainPending,
   digestPending,
 }: FiltersBarProps) {
   return (
@@ -100,10 +96,6 @@ export function FiltersBar({
 
       <div className="flex-1" />
 
-      <Button variant="outline" size="sm" onClick={onTrain} disabled={trainPending}>
-        <Sparkles className="h-3.5 w-3.5" />
-        {trainPending ? "Training…" : "Train calibration model"}
-      </Button>
       <Button variant="outline" size="sm" onClick={onDigest} disabled={digestPending}>
         <Mail className="h-3.5 w-3.5" />
         {digestPending ? "Sending…" : "Send weekly digest"}

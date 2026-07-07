@@ -12,36 +12,49 @@
     .toggles { display: flex; gap: 6px; margin-top: 6px; }
     .toggles button { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid #2d323a; background: #262a30; color: #969aa3; cursor: pointer; }
     .toggles button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
-    #save { width: 100%; margin-top: 12px; padding: 8px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-weight: 600; cursor: pointer; }
+    #save, #loginBtn { width: 100%; margin-top: 12px; padding: 8px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-weight: 600; cursor: pointer; }
     #status { margin-top: 8px; font-size: 12px; text-align: center; }
-    .settings-link { display: block; margin-top: 10px; font-size: 11px; opacity: 0.6; cursor: pointer; text-align: right; }
+    .muted { font-size: 12px; opacity: 0.75; line-height: 1.4; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h3>Rate current problem</h3>
-  <div>
-    <label>Difficulty (your own rating)</label>
-    <div class="stars" id="stars">
-      <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
+  <!-- Logged-out view -->
+  <div id="loggedOut" class="hidden">
+    <h3>Sign in to AlgoLog</h3>
+    <p class="muted">Log in on the web app to start rating problems. This popup will unlock automatically once you do.</p>
+    <button id="loginBtn">Log in on the web app</button>
+    <div id="loginHint" class="muted" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- Rating view -->
+  <div id="rating" class="hidden">
+    <h3>Log a new attempt</h3>
+    <label>Title</label>
+    <input id="title" type="text" placeholder="Problem title" />
+    <div>
+      <label>Difficulty (your own rating)</label>
+      <div class="stars" id="stars">
+        <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
+      </div>
     </div>
-  </div>
-  <div>
-    <label>Did you solve it yourself?</label>
-    <div class="toggles" id="toggles">
-      <button data-solved="true">Yes</button>
-      <button data-solved="false">No</button>
+    <div>
+      <label>Did you solve it yourself?</label>
+      <div class="toggles" id="toggles">
+        <button data-solved="true">Yes</button>
+        <button data-solved="false">No</button>
+      </div>
     </div>
+    <label>Tags (comma-separated — used to find similar problems)</label>
+    <input id="tags" type="text" placeholder="dp, binary-search, graph..." />
+    <label>Notes (optional)</label>
+    <textarea id="notes" rows="3" placeholder="What tripped you up / key insight..."></textarea>
+    <button id="save">+ Add problem</button>
+    <div id="status"></div>
   </div>
-  <label>Notes (optional)</label>
-  <textarea id="notes" rows="3" placeholder="What tripped you up / key insight..."></textarea>
-  <button id="save">+ Log attempt</button>
-  <div id="status"></div>
-  <span class="settings-link" id="settingsToggle">API settings</span>
-  <div id="settingsPanel" style="display:none; margin-top:8px;">
-    <label>Backend API key</label>
-    <input id="apiKeyInput" type="text" />
-    <button id="saveKey" style="margin-top:6px; width:100%;">Save key</button>
-  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

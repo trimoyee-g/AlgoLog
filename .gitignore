@@ -13,6 +13,10 @@ __pycache__/
 .venv/
 venv/
 
+# AlgoLog runtime artifacts (secrets / per-user state — never commit)
+.algolog/
+mcp_refresh_token
+
 # Editor / OS
 .vscode/
 .idea/

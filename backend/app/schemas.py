@@ -9,7 +9,7 @@ class AttemptCreate(BaseModel):
     title: str
     platform: str  # leetcode | codeforces | codechef | atcoder | gfg
     official_difficulty: Optional[str] = None
-    tags: Optional[str] = None
+    tags: str  # required — the sole embedding signal
     description_snippet: Optional[str] = None
     rating: int  # 1-5
     solved_self: bool
@@ -61,39 +61,3 @@ class SimilarProblemOut(BaseModel):
     latest_rating: Optional[int]
     latest_solved_self: Optional[bool]
     similarity: float
-
-
-class CalibrationRequest(BaseModel):
-    platform: str
-    official_difficulty: Optional[str] = None
-    tags: Optional[str] = None
-    time_taken_minutes: Optional[int] = None
-
-
-class CalibrationResponse(BaseModel):
-    predicted_rating: float
-    confidence_note: str
-
-
-class GradingStartRequest(BaseModel):
-    problem_title: str
-    problem_tags: Optional[str] = None
-
-
-class GradingStartResponse(BaseModel):
-    session_id: str
-    question: str
-
-
-class GradingAnswerRequest(BaseModel):
-    session_id: str
-    question: str
-    problem_title: str
-    problem_tags: Optional[str] = None
-    user_answer: str
-
-
-class GradingAnswerResponse(BaseModel):
-    verdict: str  # "pass" | "retry" | "fail"
-    feedback: str
-    follow_up_question: Optional[str] = None

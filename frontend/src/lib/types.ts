@@ -1,4 +1,4 @@
-export type Platform = "leetcode" | "codeforces" | "codechef" | "atcoder" | "gfg";
+export type Platform = "leetcode" | "codeforces" | "codechef" | "atcoder" | "gfg" | "other";
 
 export const PLATFORMS: Platform[] = [
   "leetcode",
@@ -6,6 +6,7 @@ export const PLATFORMS: Platform[] = [
   "codechef",
   "atcoder",
   "gfg",
+  "other",
 ];
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
@@ -14,6 +15,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   codechef: "CodeChef",
   atcoder: "AtCoder",
   gfg: "GFG",
+  other: "Other",
 };
 
 export interface Attempt {

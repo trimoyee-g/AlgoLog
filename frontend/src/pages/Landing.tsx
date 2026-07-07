@@ -6,7 +6,6 @@ import {
   Github,
   Star,
   Search,
-  Target,
   Mail,
   ArrowRight,
 } from "lucide-react";
@@ -28,11 +27,6 @@ const FEATURES = [
     icon: Search,
     title: "Pattern recall",
     body: "Embedding similarity search surfaces problems you've struggled with before you repeat the mistake.",
-  },
-  {
-    icon: Target,
-    title: "Calibration model",
-    body: "Learns your personal difficulty curve so “medium” means something specific to you.",
   },
   {
     icon: Mail,
@@ -112,8 +106,8 @@ export default function Landing() {
 
           <Reveal delay={0.08}>
             <h1 className="mx-auto max-w-[720px] text-[44px] font-medium leading-[1.2] tracking-tight">
-              Stop copy-pasting solutions{" "}
-              <span className="text-primary">you don't actually understand.</span>
+              Track what you actually solve,{" "}
+              <span className="text-primary">not just what you finish.</span>
             </h1>
           </Reveal>
 
@@ -220,7 +214,7 @@ export default function Landing() {
             getting better.
           </p>
         </Reveal>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f, i) => (
             <Reveal key={f.title} delay={i * 0.08}>
               <HoverLift>
@@ -243,7 +237,7 @@ export default function Landing() {
         <Reveal className="mx-auto mb-12 max-w-[560px] text-center">
           <h2 className="text-[28px] font-medium tracking-tight">How it works</h2>
           <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-            Three steps, no manual logging.
+            Three steps, done in seconds.
           </p>
         </Reveal>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

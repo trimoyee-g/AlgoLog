@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Welcome to AlgoLog</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #13161a; color: #e6eaef; margin: 0;
+           min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { max-width: 420px; padding: 40px; text-align: center; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    p { font-size: 14px; line-height: 1.5; opacity: 0.8; }
+    button { margin-top: 20px; padding: 10px 22px; border-radius: 8px; border: none;
+             background: #3b82f6; color: white; font-weight: 600; font-size: 14px; cursor: pointer; }
+    #hint { margin-top: 16px; font-size: 13px; opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Welcome to AlgoLog 👋</h1>
+    <p>Rate every problem you solve so you actually remember which ones tripped you up. First, sign in.</p>
+    <button id="getStarted">Get started</button>
+    <div id="hint"></div>
+  </div>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="onboarding.js"></script>
+</body>
+</html>

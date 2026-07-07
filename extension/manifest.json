@@ -3,17 +3,14 @@
   "name": "AlgoLog",
   "version": "1.0.0",
   "description": "Self-rate every LeetCode/Codeforces/CodeChef/AtCoder/GFG submission so you actually remember which problems you struggled with.",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
-    "https://leetcode.com/*",
-    "https://codeforces.com/*",
-    "https://www.codechef.com/*",
-    "https://atcoder.jp/*",
-    "https://www.geeksforgeeks.org/*",
-    "http://localhost:8000/*"
+    "http://localhost:8000/*",
+    "http://localhost:5173/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["config.js", "background.js"]
   },
   "action": {
     "default_popup": "popup.html",
@@ -21,29 +18,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://leetcode.com/problems/*"],
-      "js": ["content_scripts/common.js", "content_scripts/leetcode.js"],
-      "css": ["content_scripts/overlay.css"]
-    },
-    {
-      "matches": ["https://codeforces.com/*"],
-      "js": ["content_scripts/common.js", "content_scripts/codeforces.js"],
-      "css": ["content_scripts/overlay.css"]
-    },
-    {
-      "matches": ["https://www.codechef.com/*"],
-      "js": ["content_scripts/common.js", "content_scripts/codechef.js"],
-      "css": ["content_scripts/overlay.css"]
-    },
-    {
-      "matches": ["https://atcoder.jp/*"],
-      "js": ["content_scripts/common.js", "content_scripts/atcoder.js"],
-      "css": ["content_scripts/overlay.css"]
-    },
-    {
-      "matches": ["https://www.geeksforgeeks.org/*"],
-      "js": ["content_scripts/common.js", "content_scripts/gfg.js"],
-      "css": ["content_scripts/overlay.css"]
+      "matches": ["http://localhost:5173/*"],
+      "js": ["content_scripts/bridge.js"],
+      "run_at": "document_idle"
     }
   ],
   "icons": {

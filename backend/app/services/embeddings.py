@@ -18,13 +18,3 @@ def embed_text(text: str) -> list[float]:
     model = _get_model()
     vec = model.encode(text, normalize_embeddings=True)
     return vec.tolist()
-
-
-def build_embedding_text(title: str, tags: str | None, description_snippet: str | None) -> str:
-    """Combine the fields that matter for 'this feels like a similar problem'."""
-    parts = [title]
-    if tags:
-        parts.append(tags)
-    if description_snippet:
-        parts.append(description_snippet)
-    return " | ".join(parts)

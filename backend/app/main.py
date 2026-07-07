@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import Base, engine, SessionLocal
-from app.routers import attempts, similarity, calibration_router, grading_router, stats_router
+from app.routers import attempts, similarity, stats_router
 from app.services.digest import run_weekly_digest
 
 scheduler = BackgroundScheduler()
@@ -28,6 +28,16 @@ async def lifespan(app: FastAPI):
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
     Base.metadata.create_all(bind=engine)
+
+    # ANN index for 'find similar' — matches the <=> cosine ops our queries use.
+    # ponytail: lists=100 is fine into the low tens of thousands of rows;
+    # bump toward rows/1000 (and re-create) if search latency ever shows up.
+    with engine.connect() as conn:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_problems_embedding ON problems "
+            "USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+        ))
+        conn.commit()
 
     # Every Sunday at 6pm, send the digest email
     scheduler.add_job(_sunday_digest_job, "cron", day_of_week="sun", hour=18, minute=0)
@@ -50,8 +60,6 @@ app.add_middleware(
 
 app.include_router(attempts.router)
 app.include_router(similarity.router)
-app.include_router(calibration_router.router)
-app.include_router(grading_router.router)
 app.include_router(stats_router.router)
 
 

@@ -7,7 +7,7 @@ from app.database import get_db
 from app.deps import require_user
 from app.models import Problem, Attempt, Platform
 from app.schemas import AttemptCreate, ProblemOut, ProblemUpdate
-from app.services.embeddings import embed_text, build_embedding_text
+from app.services.embeddings import embed_text
 
 router = APIRouter(prefix="/api", tags=["attempts"])
 
@@ -34,8 +34,7 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
             tags=payload.tags,
             description_snippet=payload.description_snippet,
         )
-        emb_text = build_embedding_text(payload.title, payload.tags, payload.description_snippet)
-        problem.embedding = embed_text(emb_text)
+        problem.embedding = embed_text(payload.tags)
         db.add(problem)
         db.flush()
 
@@ -80,9 +79,8 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
     if payload.tags is not None:
         problem.tags = payload.tags
 
-    if payload.title is not None or payload.tags is not None:
-        emb_text = build_embedding_text(problem.title, problem.tags, problem.description_snippet)
-        problem.embedding = embed_text(emb_text)
+    if payload.tags is not None:
+        problem.embedding = embed_text(payload.tags)
 
     if payload.rating is not None or payload.solved_self is not None:
         latest = max(problem.attempts, key=lambda a: a.created_at) if problem.attempts else None

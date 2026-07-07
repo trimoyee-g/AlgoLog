@@ -6,10 +6,8 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "phi3"
 
-    # Supabase auth: JWT secret from Project Settings > API > JWT Secret (HS256).
-    # ponytail: HS256 shared-secret verify. If you switch Supabase to asymmetric
-    # signing keys, move deps.py to JWKS fetch instead.
-    SUPABASE_JWT_SECRET: str = "change-me"
+    # Supabase auth: project uses asymmetric JWT signing keys (ES256)
+    SUPABASE_PROJECT_URL: str = "https://zgeymiyigfcyowdyrdln.supabase.co/"
     FRONTEND_ORIGIN: str = "http://localhost:5173"
 
     SMTP_HOST: str = "smtp.gmail.com"

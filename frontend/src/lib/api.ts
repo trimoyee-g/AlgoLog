@@ -91,13 +91,6 @@ export function getSimilar(problemId: number, limit = 5) {
   );
 }
 
-export function trainCalibration() {
-  return request<{ trained: boolean; samples_used?: number; reason?: string }>(
-    "/api/calibration/train",
-    { method: "POST" }
-  );
-}
-
 export function sendDigestNow() {
   return request<{ narrative?: string }>("/api/stats/digest/send-now", {
     method: "POST",

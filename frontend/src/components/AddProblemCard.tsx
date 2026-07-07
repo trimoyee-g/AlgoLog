@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { addAttempt } from "@/lib/api";
 import { PLATFORMS, PLATFORM_LABELS, type Platform } from "@/lib/types";
 
@@ -21,8 +22,9 @@ const emptyForm = {
   title: "",
   platform: "leetcode" as Platform,
   tags: "",
-  rating: "3",
-  solvedSelf: "true",
+  rating: 3,
+  solvedSelf: true,
+  notes: "",
 };
 
 export function AddProblemCard({ bare, onSuccess }: { bare?: boolean; onSuccess?: () => void } = {}) {
@@ -54,32 +56,22 @@ export function AddProblemCard({ bare, onSuccess }: { bare?: boolean; onSuccess?
       title: form.title.trim(),
       platform: form.platform,
       tags: form.tags.trim() || null,
-      rating: parseInt(form.rating, 10),
-      solved_self: form.solvedSelf === "true",
+      rating: form.rating,
+      solved_self: form.solvedSelf,
+      notes: form.notes.trim() || null,
     });
   };
 
   const form_ = (
-    <form
-      onSubmit={handleSubmit}
-      className="grid grid-cols-2 gap-3 md:grid-cols-6 md:items-end"
-    >
-        <div className="col-span-2 space-y-1.5 md:col-span-2">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
           <Label htmlFor="url">Problem URL</Label>
           <Input
             id="url"
             placeholder="leetcode.com/problems/two-sum"
             value={form.url}
             onChange={(e) => setForm({ ...form, url: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5 md:col-span-1">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            placeholder="Two sum"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
         </div>
         <div className="space-y-1.5">
@@ -100,55 +92,83 @@ export function AddProblemCard({ bare, onSuccess }: { bare?: boolean; onSuccess?
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="tags">Tags</Label>
-          <Input
-            id="tags"
-            placeholder="dp, graph"
-            value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Rating</Label>
-          <Select
-            value={form.rating}
-            onValueChange={(v) => setForm({ ...form, rating: v })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <SelectItem key={n} value={String(n)}>
-                  {n}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="col-span-2 flex items-end gap-3 md:col-span-6">
-          <div className="flex-1 space-y-1.5">
-            <Label>Solved myself</Label>
-            <Select
-              value={form.solvedSelf}
-              onValueChange={(v) => setForm({ ...form, solvedSelf: v })}
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="title">Title</Label>
+        <Input
+          id="title"
+          placeholder="Two sum"
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Difficulty (your own rating)</Label>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setForm({ ...form, rating: n })}
+              className="p-0.5"
+              aria-label={`Rate ${n}`}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Yes</SelectItem>
-                <SelectItem value="false">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" disabled={mutation.isPending} className="shrink-0">
-            <Plus className="h-4 w-4" />
-            {mutation.isPending ? "Adding…" : "Add problem"}
-          </Button>
+              <Star
+                className={cn(
+                  "h-6 w-6",
+                  n <= form.rating
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-muted-foreground/40"
+                )}
+              />
+            </button>
+          ))}
         </div>
-      </form>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Did you solve it yourself?</Label>
+        <div className="flex gap-2">
+          {[
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ].map((opt) => (
+            <Button
+              key={opt.label}
+              type="button"
+              variant={form.solvedSelf === opt.value ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setForm({ ...form, solvedSelf: opt.value })}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="tags">Tags (comma-separated — used to find similar problems)</Label>
+        <Input
+          id="tags"
+          placeholder="dp, binary-search, graph..."
+          value={form.tags}
+          onChange={(e) => setForm({ ...form, tags: e.target.value })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="notes">Notes (optional)</Label>
+        <textarea
+          id="notes"
+          rows={3}
+          placeholder="What tripped you up / key insight..."
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          className="flex w-full rounded-md border border-input bg-background/40 px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+      </div>
+      <Button type="submit" disabled={mutation.isPending} className="w-full">
+        <Plus className="h-4 w-4" />
+        {mutation.isPending ? "Adding…" : "Add problem"}
+      </Button>
+    </form>
   );
 
   if (bare) return form_;
