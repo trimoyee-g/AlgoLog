@@ -97,9 +97,8 @@ digest are all deterministic rules — reproducible and debuggable. Auth is hand
 
 | Feature | How it works |
 |---|---|
-| **Self-rating** | Every attempt logs a 1–5 difficulty score + a `solved_self` flag + optional time, tags, and notes. Repeat attempts on the same problem are kept as history, not overwritten. |
+| **Self-rating** | Every attempt logs a 1–5 difficulty score + a `solved_self` flag + tags and notes. Repeat attempts on the same problem are kept as history, not overwritten. |
 | **Similarity search** | A problem's comma-separated tags are embedded with `all-MiniLM-L6-v2` and stored in pgvector. "Find similar" returns the closest matches from *your own* history. |
-| **Free-text similarity** | Search history by describing a problem in plain text — useful to check "have I seen something like this before?" before you start. |
 | **Spaced repetition** | An SM-2 variant reschedules each problem from its attempt history — fail/struggle resets the interval to 1 day, clean recalls stretch it out (1 → 6 → ×ease). No scheduler state is stored; the schedule is *derived* by folding SM-2 over the immutable attempt log. The dashboard **Review** tab and `/review` page surface what's due. |
 | **Weak-topic detection** | For each tag, the recent (90-day) solved-unaided rate; a tag is "weak" below 50% *with* ≥3 attempts, so one bad problem never brands a topic weak forever. |
 | **Recommend next** | Combines due-for-review + weak topics into one ranked, *reasoned* suggestion — `high` = overdue **and** a weak topic — each with a plain-English `reason` string so a coach (or Claude) can say *why*. |
@@ -166,7 +165,6 @@ All endpoints require `Authorization: Bearer <supabase-jwt>`. Base URL `http://l
 | Method | Path | Description |
 |---|---|---|
 | GET | `/problems/{id}/similar` | Embedding-similar problems from your history |
-| GET | `/problems/search-similar-text?text=...` | Free-text similarity search |
 
 ### Spaced repetition — `/api/review`
 
@@ -190,12 +188,11 @@ Health check: `GET /health` → `{"status":"ok"}` · Interactive docs: `http://l
 
 ## MCP Server
 
-Uses `FastMCP` and exposes four tools to any MCP client (e.g. Claude Desktop / Claude Code):
+Uses `FastMCP` and exposes three tools to any MCP client (e.g. Claude Desktop / Claude Code):
 
 | Tool | What it does |
 |---|---|
 | `get_weak_problems` | Problems you rated hard (≥ threshold) or couldn't solve unaided |
-| `get_similar_problems` | Free-text similarity search over your history |
 | `get_stats_overview` | Overall practice stats |
 | `get_recommended_problem` | Reasoned "what to work on next" — SM-2 due dates + weak topics combined into a ranked list with `reason`/`priority`, so Claude can coach you unprompted |
 
