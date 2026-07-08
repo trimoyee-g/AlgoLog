@@ -6,7 +6,6 @@ from app.database import get_db
 from app.deps import require_user
 from app.models import Problem, Attempt
 from app.schemas import SimilarProblemOut
-from app.services.embeddings import embed_text
 
 router = APIRouter(prefix="/api", tags=["similarity"])
 
@@ -40,41 +39,6 @@ def find_similar(problem_id: int, limit: int = 5, db: Session = Depends(get_db),
     for p, distance in results:
         latest = max(p.attempts, key=lambda a: a.created_at) if p.attempts else None
         # cosine_distance = 1 - cosine_similarity, so convert back for a friendlier number
-        similarity = 1 - float(distance) if distance is not None else 0.0
-        out.append(SimilarProblemOut(
-            id=p.id,
-            url=p.url,
-            title=p.title,
-            platform=p.platform.value if hasattr(p.platform, "value") else str(p.platform),
-            tags=p.tags,
-            latest_rating=latest.rating if latest else None,
-            latest_solved_self=latest.solved_self if latest else None,
-            similarity=round(similarity, 3),
-        ))
-    return out
-
-
-@router.get("/problems/search-similar-text", response_model=list[SimilarProblemOut])
-def search_similar_by_text(text: str, limit: int = 5, db: Session = Depends(get_db),
-                           user_id: str = Depends(require_user)):
-    """
-    Same idea but for a problem not yet in the DB - e.g. the extension can call
-    this the moment a new problem page loads, before any submission happens,
-    to warn you upfront: 'this looks like problem X you rated 4/5 before'.
-    """
-    query_embedding = embed_text(text)
-    dist = Problem.embedding.cosine_distance(query_embedding)
-    results = (
-        db.query(Problem, dist.label("distance"))
-        .filter(Problem.user_id == user_id)
-        .filter(Problem.embedding.isnot(None))
-        .order_by(dist)
-        .limit(limit)
-        .all()
-    )
-    out = []
-    for p, distance in results:
-        latest = max(p.attempts, key=lambda a: a.created_at) if p.attempts else None
         similarity = 1 - float(distance) if distance is not None else 0.0
         out.append(SimilarProblemOut(
             id=p.id,

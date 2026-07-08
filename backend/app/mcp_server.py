@@ -109,15 +109,6 @@ async def get_weak_problems(
 
 
 @mcp.tool()
-async def get_similar_problems(
-    text: Annotated[str, Field(description="Problem title and/or short description")],
-    limit: int = 5,
-) -> str:
-    """Given free-text describing a problem, find similar problems from the user's own history via embedding similarity - useful to check 'have I seen something like this before'."""
-    return await _get("/api/problems/search-similar-text", text=text, limit=limit)
-
-
-@mcp.tool()
 async def get_stats_overview() -> str:
     """Get overall practice stats: total problems, total attempts, solved-unaided count, hard-rated count."""
     return await _get("/api/stats/overview")

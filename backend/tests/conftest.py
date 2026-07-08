@@ -106,7 +106,6 @@ def client(db_session, monkeypatch):
     (real-DB index creation + APScheduler start) never runs — exactly what we want.
     """
     monkeypatch.setattr("app.routers.attempts.embed_text", fake_embedding)
-    monkeypatch.setattr("app.routers.similarity.embed_text", fake_embedding)
 
     from app.main import app
 

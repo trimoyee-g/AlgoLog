@@ -10,10 +10,8 @@ class AttemptCreate(BaseModel):
     platform: str  # leetcode | codeforces | codechef | atcoder | gfg
     official_difficulty: Optional[str] = None
     tags: str  # required — the sole embedding signal
-    description_snippet: Optional[str] = None
     rating: int  # 1-5
     solved_self: bool
-    time_taken_minutes: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -30,7 +28,6 @@ class AttemptOut(BaseModel):
     id: int
     rating: int
     solved_self: bool
-    time_taken_minutes: Optional[int]
     notes: Optional[str]
     created_at: datetime
 

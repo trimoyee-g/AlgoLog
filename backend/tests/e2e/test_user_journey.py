@@ -33,11 +33,8 @@ def test_log_review_and_digest_journey(client):
     assert ov["hard_rated_count"] == 1
     assert ov["solved_self_count"] == 1
 
-    # 4. "find similar to this one I struggled with" + free-text pre-check
+    # 4. "find similar to this one I struggled with"
     assert client.get(f"/api/problems/{pid}/similar").status_code == 200
-    txt = client.get("/api/problems/search-similar-text",
-                     params={"text": "dynamic programming,arrays"}).json()
-    assert txt[0]["url"] == "https://leetcode.com/lis"  # matches by tag embedding
 
     # 5. weekly digest on demand
     digest_body = client.post("/api/stats/digest/send-now").json()

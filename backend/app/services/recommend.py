@@ -91,6 +91,14 @@ def review_queue(db: Session, user_id: str, due_only: bool = True) -> list[dict]
 _RANK = {"high": 3, "medium": 2, "low": 1}
 
 
+def _tags_meeting(rates: dict[str, dict], threshold: float, *, above: bool) -> set[str]:
+    """Tags with enough evidence whose rate is >= threshold (above) or < threshold."""
+    return {
+        t for t, r in rates.items()
+        if r["total"] >= MIN_ATTEMPTS and (r["rate"] >= threshold if above else r["rate"] < threshold)
+    }
+
+
 def rank_candidates(items: list[dict], rates: dict[str, dict], now: datetime, count: int) -> list[dict]:
     """Pure ranking core — no DB, so it's directly testable and deterministic.
 
@@ -100,8 +108,8 @@ def rank_candidates(items: list[dict], rates: dict[str, dict], now: datetime, co
       medium = overdue, or in a weak topic (one signal)
       low    = neither: a growth-edge nudge toward a strong topic at a harder tier
     """
-    weak = {t for t, r in rates.items() if r["total"] >= MIN_ATTEMPTS and r["rate"] < WEAK_THRESHOLD}
-    strong = {t for t, r in rates.items() if r["total"] >= MIN_ATTEMPTS and r["rate"] >= STRONG_THRESHOLD}
+    weak = _tags_meeting(rates, WEAK_THRESHOLD, above=False)
+    strong = _tags_meeting(rates, STRONG_THRESHOLD, above=True)
 
     cands = []
     for it in items:
@@ -111,13 +119,15 @@ def rank_candidates(items: list[dict], rates: dict[str, dict], now: datetime, co
         overdue = s.due <= now
         overdue_days = max(0, (now - s.due).days)
 
+        worst = min(weak_hit, key=lambda t: rates[t]["rate"]) if weak_hit else None
+        worst_rate = rates[worst]["rate"] if worst else 1.0
+
         parts = []
         if overdue:
             days_since = (now - s.last_review).days
             parts.append(f"Due for review (last solved {days_since} days ago, interval {s.interval_days}d)")
-        if weak_hit:
-            worst = min(weak_hit, key=lambda t: rates[t]["rate"])
-            parts.append(f"tagged '{worst}' where you solve only {round(rates[worst]['rate'] * 100)}% unaided")
+        if worst:
+            parts.append(f"tagged '{worst}' where you solve only {round(worst_rate * 100)}% unaided")
 
         if overdue and weak_hit:
             priority = "high"
@@ -133,7 +143,6 @@ def rank_candidates(items: list[dict], rates: dict[str, dict], now: datetime, co
             else:
                 parts.append("fresh and on track — a light revisit keeps it sharp")
 
-        worst_rate = min((rates[t]["rate"] for t in weak_hit), default=1.0)
         cands.append({
             "problem_id": it["problem_id"],
             "problem": it["problem"],

@@ -7,7 +7,7 @@ import pytest
 
 from app.models import Problem, Attempt, Platform
 from tests.conftest import TEST_USER_ID, OTHER_USER_ID
-from tests.helpers import basis_vec, fake_embedding
+from tests.helpers import basis_vec
 
 pytestmark = pytest.mark.integration
 
@@ -65,16 +65,3 @@ def test_similar_respects_limit(client, db_session):
         _mk_problem(db_session, f"https://n{i}", "dp", basis_vec(0))
 
     assert len(client.get(f"/api/problems/{target.id}/similar?limit=2").json()) == 2
-
-
-def test_search_similar_text_finds_closest_by_tags(client, db_session):
-    # store two problems whose embeddings are fake_embedding(their tags);
-    # querying the exact tag string of one must rank it first (distance ~0).
-    _mk_problem(db_session, "https://a", "dynamic programming", fake_embedding("dynamic programming"))
-    _mk_problem(db_session, "https://b", "graphs", fake_embedding("graphs"))
-
-    results = client.get("/api/problems/search-similar-text",
-                         params={"text": "dynamic programming"}).json()
-
-    assert results[0]["url"] == "https://a"
-    assert results[0]["similarity"] == pytest.approx(1.0, abs=1e-6)

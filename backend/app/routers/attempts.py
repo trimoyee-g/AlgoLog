@@ -32,7 +32,6 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
             platform=Platform(payload.platform),
             official_difficulty=payload.official_difficulty,
             tags=payload.tags,
-            description_snippet=payload.description_snippet,
         )
         problem.embedding = embed_text(payload.tags)
         db.add(problem)
@@ -43,7 +42,6 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
         problem_id=problem.id,
         rating=payload.rating,
         solved_self=payload.solved_self,
-        time_taken_minutes=payload.time_taken_minutes,
         notes=payload.notes,
     )
     db.add(attempt)

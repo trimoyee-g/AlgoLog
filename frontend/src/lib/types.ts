@@ -22,7 +22,6 @@ export interface Attempt {
   id: number;
   rating: number;
   solved_self: boolean;
-  time_taken_minutes: number | null;
   notes: string | null;
   created_at: string;
 }
@@ -62,10 +61,8 @@ export interface AttemptCreate {
   platform: Platform;
   official_difficulty?: string | null;
   tags?: string | null;
-  description_snippet?: string | null;
   rating: number;
   solved_self: boolean;
-  time_taken_minutes?: number | null;
   notes?: string | null;
 }
 

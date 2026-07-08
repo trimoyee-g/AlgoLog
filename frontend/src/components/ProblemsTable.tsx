@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { ExternalLink, Pencil, Search } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDown, ChevronRight, ExternalLink, Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { latestAttempt, PLATFORM_LABELS, type Problem } from "@/lib/types";
+import { latestAttempt, PLATFORM_LABELS, type Attempt, type Problem } from "@/lib/types";
 import { EditProblemDialog } from "@/components/EditProblemDialog";
 import { SimilarDialog } from "@/components/SimilarDialog";
 
@@ -21,6 +21,14 @@ function ratingVariant(rating: number): "success" | "warning" | "destructive" {
 export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
   const [editing, setEditing] = useState<Problem | null>(null);
   const [similarFor, setSimilarFor] = useState<Problem | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggle = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   return (
     <Card className="overflow-hidden p-0">
@@ -48,10 +56,11 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
       {!loading &&
         problems.map((p) => {
           const latest = latestAttempt(p);
+          const isOpen = expanded.has(p.id);
           return (
+            <Fragment key={p.id}>
             <div
-              key={p.id}
-              className="grid grid-cols-[2.2fr_1fr_0.8fr_0.9fr_0.7fr_auto] items-center gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-secondary/40"
+              className="grid grid-cols-[2.2fr_1fr_0.8fr_0.9fr_0.7fr_auto] items-center gap-2 border-b border-border px-4 py-3 text-sm hover:bg-secondary/40"
             >
               <div>
                 <a
@@ -107,8 +116,22 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={isOpen ? "Hide attempt history" : "Show attempt history"}
+                  onClick={() => toggle(p.id)}
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </div>
+            {isOpen && <AttemptHistory attempts={p.attempts} />}
+            </Fragment>
           );
         })}
 
@@ -121,5 +144,32 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
         onOpenChange={(open) => !open && setSimilarFor(null)}
       />
     </Card>
+  );
+}
+
+/** Newest-first attempt timeline, shown when a problem's row is expanded. */
+function AttemptHistory({ attempts }: { attempts: Attempt[] }) {
+  const ordered = [...attempts].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  return (
+    <div className="border-b border-border bg-secondary/30 px-4 py-3">
+      <div className="grid grid-cols-[auto_auto_1fr_auto] gap-x-4 gap-y-1.5 text-xs">
+        {ordered.map((a) => (
+          <Fragment key={a.id}>
+            <Badge variant={ratingVariant(a.rating)}>{a.rating}/5</Badge>
+            <span className="text-muted-foreground">
+              {a.solved_self ? "solved myself" : "needed help"}
+            </span>
+            <span className="truncate text-muted-foreground" title={a.notes ?? ""}>
+              {a.notes || ""}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {new Date(a.created_at).toLocaleDateString()}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+    </div>
   );
 }

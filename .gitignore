@@ -22,3 +22,6 @@ mcp_refresh_token
 .idea/
 .DS_Store
 Thumbs.db
+
+# coverage artifacts
+.coverage

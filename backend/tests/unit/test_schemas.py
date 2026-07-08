@@ -13,14 +13,13 @@ def _valid_attempt(**over):
 
 
 def test_attempt_create_accepts_full_payload():
-    a = AttemptCreate(**_valid_attempt(time_taken_minutes=20, notes="hard"))
+    a = AttemptCreate(**_valid_attempt(notes="hard"))
     assert a.rating == 3 and a.solved_self is True and a.tags == "dp,arrays"
 
 
 def test_attempt_create_optional_fields_default_none():
     a = AttemptCreate(**_valid_attempt())
     assert a.official_difficulty is None
-    assert a.time_taken_minutes is None
     assert a.notes is None
 
 

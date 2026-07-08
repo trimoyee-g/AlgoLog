@@ -42,7 +42,6 @@ class Problem(Base):
     platform = Column(Enum(Platform), nullable=False)
     official_difficulty = Column(String, nullable=True)  # e.g. "Medium", "1800", "Div2-C"
     tags = Column(String, nullable=False)  # comma-separated; the sole embedding signal
-    description_snippet = Column(Text, nullable=True)  # short text used for embeddings
     embedding = Column(Vector(settings.EMBEDDING_DIM), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -57,7 +56,6 @@ class Attempt(Base):
     problem_id = Column(Integer, ForeignKey("problems.id"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5, user's own difficulty rating
     solved_self = Column(Boolean, nullable=False)  # did they solve it without external help
-    time_taken_minutes = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
