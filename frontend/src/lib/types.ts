@@ -85,6 +85,33 @@ export interface ProblemFilters {
   tag?: string;
 }
 
+export interface ReviewItem {
+  id: number;
+  url: string;
+  title: string;
+  platform: Platform;
+  tags: string | null;
+  interval_days: number;
+  ease: number;
+  repetitions: number;
+  last_review: string;
+  due: string;
+  overdue_days: number;
+}
+
+/**
+ * Map an SM-2 recall quality (0-5) onto the (rating, solved_self) signal the
+ * backend already stores, so a review is just another logged attempt.
+ * All fails (q<3) reset scheduling to 1 day, so 0/1/2 collapse — losslessly,
+ * since the scheduler treats them identically.
+ */
+export function reviewSignal(quality: number): { rating: number; solved_self: boolean } {
+  if (quality < 3) return { rating: 4, solved_self: false }; // failed recall -> resurface soon
+  if (quality === 3) return { rating: 5, solved_self: true }; // barely got it
+  if (quality === 4) return { rating: 3, solved_self: true }; // solid, a little effort
+  return { rating: 1, solved_self: true }; // perfect recall
+}
+
 /** Derived, computed client-side from the problems list - not stored anywhere. */
 export function latestAttempt(p: Problem): Attempt | null {
   if (!p.attempts.length) return null;

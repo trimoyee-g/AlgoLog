@@ -3,8 +3,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://dsa:dsa@localhost:5432/algolog"
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "phi3"
 
     # Supabase auth: project uses asymmetric JWT signing keys (ES256)
     SUPABASE_PROJECT_URL: str = "https://zgeymiyigfcyowdyrdln.supabase.co/"
@@ -21,6 +19,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # tolerate stale/unknown env vars (e.g. removed OLLAMA_*)
 
 
 settings = Settings()

@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==8.3.3
+pytest-cov==5.0.0
+numpy>=1.26  # already pulled in by torch, pinned loose so unit tests can build fake vectors

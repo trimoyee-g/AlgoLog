@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Home, Plus } from "lucide-react";
+import { Brain, Home, Plus } from "lucide-react";
 import { StatsCards } from "@/components/StatsCards";
 import { UnaidedRing } from "@/components/UnaidedRing";
 import { RatingDistribution } from "@/components/RatingDistribution";
 import { AddProblemCard } from "@/components/AddProblemCard";
 import { FiltersBar, type FilterDraft } from "@/components/FiltersBar";
 import { ProblemsTable } from "@/components/ProblemsTable";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,7 +54,7 @@ export default function Dashboard() {
   const digestMutation = useMutation({
     mutationFn: sendDigestNow,
     onSuccess: (data) => {
-      toast.success(data.narrative ?? "Digest sent — check your inbox.");
+      toast.success(data.note ?? "Digest sent — check your inbox.");
     },
     onError: (err: Error) => toast.error(`Digest failed: ${err.message}`),
   });
@@ -79,6 +80,12 @@ export default function Dashboard() {
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-3.5 w-3.5" />
               Log attempt
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/review">
+                <Brain className="h-3.5 w-3.5" />
+                Review
+              </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/">
@@ -123,6 +130,10 @@ export default function Dashboard() {
                 />
                 <RatingDistribution problems={problems} />
               </div>
+            </Reveal>
+
+            <Reveal delay={0.2}>
+              <ReviewPanel />
             </Reveal>
 
             <Reveal delay={0.22}>

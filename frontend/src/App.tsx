@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
+import Review from "@/pages/Review";
 import Login from "@/pages/Login";
 import { supabase } from "@/lib/supabase";
 
@@ -38,6 +39,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/review"
+        element={
+          <RequireAuth>
+            <Review />
           </RequireAuth>
         }
       />

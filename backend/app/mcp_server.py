@@ -123,5 +123,16 @@ async def get_stats_overview() -> str:
     return await _get("/api/stats/overview")
 
 
+@mcp.tool()
+async def get_recommended_problem(
+    count: Annotated[int, Field(description="How many recommendations to return")] = 1,
+) -> str:
+    """Proactively recommend what to work on next. Combines SM-2 spaced-repetition due dates
+    with weak-topic detection into a ranked list, each with a 'reason' string and a 'priority'
+    (high = overdue AND a weak topic). Use this to coach the user unprompted, e.g. 'you're due
+    to revisit X, and you tend to struggle with dp'."""
+    return await _get("/api/stats/recommend", count=count)
+
+
 if __name__ == "__main__":
     mcp.run()

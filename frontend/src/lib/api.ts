@@ -4,6 +4,7 @@ import type {
   Problem,
   ProblemFilters,
   ProblemUpdate,
+  ReviewItem,
   SimilarProblem,
 } from "./types";
 import { supabase } from "./supabase";
@@ -65,6 +66,10 @@ export function listProblems(filters: ProblemFilters = {}) {
   return request<Problem[]>(`/api/problems${qs ? `?${qs}` : ""}`);
 }
 
+export function getReviewQueue(dueOnly = true) {
+  return request<ReviewItem[]>(`/api/review?due_only=${dueOnly}`);
+}
+
 export function addAttempt(payload: AttemptCreate) {
   return request<{ problem_id: number; attempt_id: number }>("/api/attempts", {
     method: "POST",
@@ -92,7 +97,7 @@ export function getSimilar(problemId: number, limit = 5) {
 }
 
 export function sendDigestNow() {
-  return request<{ narrative?: string }>("/api/stats/digest/send-now", {
+  return request<{ note?: string }>("/api/stats/digest/send-now", {
     method: "POST",
   });
 }

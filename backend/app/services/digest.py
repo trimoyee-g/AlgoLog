@@ -6,16 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Attempt, Problem, User
-from app.services.llm_client import generate
+from app.services.recommend import review_queue, weak_topics
 
 
-def build_weekly_stats(db: Session, user_id: str) -> dict:
-    since = datetime.utcnow() - timedelta(days=7)
+def _stats_window(db: Session, user_id: str, start: datetime, end: datetime) -> dict:
     rows = (
         db.query(Attempt, Problem)
         .join(Problem, Attempt.problem_id == Problem.id)
         .filter(Attempt.user_id == user_id)
-        .filter(Attempt.created_at >= since)
+        .filter(Attempt.created_at >= start, Attempt.created_at < end)
         .all()
     )
     total = len(rows)
@@ -24,9 +23,8 @@ def build_weekly_stats(db: Session, user_id: str) -> dict:
     by_platform: dict[str, int] = {}
     by_tag: dict[str, int] = {}
     for a, p in rows:
-        by_platform[p.platform.value if hasattr(p.platform, "value") else str(p.platform)] = (
-            by_platform.get(p.platform.value if hasattr(p.platform, "value") else str(p.platform), 0) + 1
-        )
+        plat = p.platform.value if hasattr(p.platform, "value") else str(p.platform)
+        by_platform[plat] = by_platform.get(plat, 0) + 1
         for t in (p.tags or "").split(","):
             t = t.strip()
             if t:
@@ -40,17 +38,44 @@ def build_weekly_stats(db: Session, user_id: str) -> dict:
     }
 
 
-def narrate_digest(stats: dict) -> str:
-    if stats["total"] == 0:
-        return "No attempts logged this week. Time to get back on the grind!"
+def build_weekly_stats(db: Session, user_id: str) -> dict:
+    now = datetime.utcnow()
+    return _stats_window(db, user_id, now - timedelta(days=7), now)
 
-    prompt = (
-        "You are a terse, encouraging coding-practice coach. Given this weekly stats JSON, "
-        "write a 2-3 sentence summary highlighting progress and the weakest area to focus on next week. "
-        "Be specific and concrete, no generic fluff.\n\n"
-        f"Stats: {stats}"
-    )
-    return generate(prompt, system="You write short, honest, motivating weekly coding-practice summaries.")
+
+def digest_note(this_week: dict, last_week: dict, weak: list[dict]) -> str:
+    """The 'coach voice' — templated from simple conditionals, no LLM. Reproducible."""
+    if this_week["total"] == 0:
+        return "No attempts logged this week — an easy warm-up problem is the best way back in."
+
+    def rate(s: dict) -> float:
+        return s["solved_self"] / s["total"] if s["total"] else 0.0
+
+    notes = []
+    r_now, r_prev = rate(this_week), rate(last_week)
+    if last_week["total"] and r_now > r_prev + 0.05:
+        notes.append(f"Great progress — {round(r_now * 100)}% solved unaided, up from {round(r_prev * 100)}% last week.")
+    elif last_week["total"] and r_now < r_prev - 0.05:
+        notes.append(f"Solved-unaided slipped to {round(r_now * 100)}% from {round(r_prev * 100)}% — worth a steadier week.")
+    if weak:
+        notes.append(f"Keep an eye on {weak[0]['tag']} ({round(weak[0]['solved_rate'] * 100)}% unaided).")
+    return " ".join(notes) or f"Solid week: {this_week['solved_self']}/{this_week['total']} solved unaided."
+
+
+def render_digest(stats: dict, due: list[dict], note: str) -> str:
+    lines = [note, "", "--- This week ---",
+             f"Attempts: {stats['total']}  |  Solved unaided: {stats['solved_self']}  |  Hard-rated: {stats['hard_rated']}"]
+    if stats["by_tag"]:
+        top = sorted(stats["by_tag"].items(), key=lambda kv: -kv[1])[:5]
+        lines.append("Topics: " + ", ".join(f"{t} ({n})" for t, n in top))
+    lines += ["", "--- Due for review (SM-2) ---"]
+    if due:
+        for d in due:
+            when = f"{d['overdue_days']}d overdue" if d["overdue_days"] else "due today"
+            lines.append(f"• {d['title']} — {when} (interval {d['interval_days']}d)")
+    else:
+        lines.append("Nothing due — you're caught up.")
+    return "\n".join(lines)
 
 
 def send_email(to_email: str, subject: str, body: str) -> None:
@@ -69,12 +94,16 @@ def send_email(to_email: str, subject: str, body: str) -> None:
 
 
 def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
+    now = datetime.utcnow()
     stats = build_weekly_stats(db, user_id)
-    narrative = narrate_digest(stats)
-    body = f"{narrative}\n\n--- Raw stats ---\n{stats}"
+    last_week = _stats_window(db, user_id, now - timedelta(days=14), now - timedelta(days=7))
+    weak = weak_topics(db, user_id)
+    due = review_queue(db, user_id, due_only=True)[:5]
+    note = digest_note(stats, last_week, weak)
+    body = render_digest(stats, due, note)
     user = db.get(User, user_id)
     send_email(user.email if user else "", "Your weekly DSA progress digest", body)
-    return {"stats": stats, "narrative": narrative}
+    return {"stats": stats, "due": due, "note": note}
 
 
 def run_weekly_digest(db: Session) -> dict:

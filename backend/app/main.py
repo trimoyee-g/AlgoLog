@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import Base, engine, SessionLocal
-from app.routers import attempts, similarity, stats_router
+from app.routers import attempts, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
 
 scheduler = BackgroundScheduler()
@@ -59,6 +59,7 @@ app.add_middleware(
 )
 
 app.include_router(attempts.router)
+app.include_router(review.router)
 app.include_router(similarity.router)
 app.include_router(stats_router.router)
 
