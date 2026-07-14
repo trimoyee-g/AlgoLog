@@ -1,12 +1,16 @@
+import logging
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Attempt, Problem, User
+from app.models import Attempt, DigestSend, Problem, User
 from app.services.recommend import review_queue, weak_topics
+
+log = logging.getLogger(__name__)
 
 
 def _stats_window(db: Session, user_id: str, start: datetime, end: datetime) -> dict:
@@ -106,9 +110,53 @@ def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
     return {"stats": stats, "due": due, "note": note}
 
 
+def iso_week(now: datetime) -> str:
+    year, week, _ = now.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def claim_send(db: Session, user_id: str, week: str) -> bool:
+    """Insert-or-skip. True means we own this user's send for this week."""
+    claimed = db.execute(
+        pg_insert(DigestSend)
+        .values(user_id=user_id, week=week)
+        .on_conflict_do_nothing()
+    ).rowcount == 1
+    db.commit()
+    return claimed
+
+
 def run_weekly_digest(db: Session) -> dict:
-    """Scheduled job: send each user their own digest."""
-    results = []
-    for user in db.query(User).all():
-        results.append({"user_id": user.id, **run_weekly_digest_for_user(db, user.id)})
-    return {"sent": len(results), "results": results}
+    """Scheduled job: send each user their own digest, at most once per ISO week
+    no matter how many replicas fire the cron.
+
+    ponytail: the claim row is the only coordination — no Redis, no leader election.
+    If you outgrow the in-process scheduler (SMTP is serial and runs in the web
+    process), move the cron to an external trigger hitting a job endpoint; the
+    claim stays correct either way.
+    """
+    week = iso_week(datetime.utcnow())
+    results, skipped, failed = [], 0, 0
+
+    # Snapshot the ids, don't iterate ORM instances: the loop commits (and, on
+    # failure, rolls back) underneath itself, which expires every live instance —
+    # a plain id can't go stale, and this drops a refresh query per user.
+    user_ids = [uid for (uid,) in db.query(User.id).all()]
+
+    for user_id in user_ids:
+        if not claim_send(db, user_id, week):
+            skipped += 1  # another replica already sent this user's digest
+            continue
+        try:
+            results.append({"user_id": user_id, **run_weekly_digest_for_user(db, user_id)})
+        except Exception:
+            # One bad address must not starve every user after it in the loop.
+            # Roll back whatever the failure left half-done, then drop the claim
+            # so a rerun this week retries this user.
+            failed += 1
+            log.exception("weekly digest failed for user %s", user_id)
+            db.rollback()
+            db.query(DigestSend).filter_by(user_id=user_id, week=week).delete()
+            db.commit()
+
+    return {"sent": len(results), "skipped": skipped, "failed": failed, "results": results}

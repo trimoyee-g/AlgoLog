@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, Float, DateTime, ForeignKey, Text, Enum,
-    UniqueConstraint,
+    Index, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -30,6 +30,16 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class DigestSend(Base):
+    """One row per user per ISO week. The insert *is* the lock: whichever replica
+    wins the row sends that user's digest, every other replica skips them."""
+    __tablename__ = "digest_sends"
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
+    week = Column(String, primary_key=True)  # ISO week, e.g. "2026-W28"
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Problem(Base):
     __tablename__ = "problems"
     # A problem is per-user: the same LeetCode URL can exist once per user.
@@ -50,6 +60,9 @@ class Problem(Base):
 
 class Attempt(Base):
     __tablename__ = "attempts"
+    # topic_rates() and the digest's _stats_window() both filter on exactly
+    # (user_id, created_at >= since) — without this they scan every user's attempts.
+    __table_args__ = (Index("ix_attempts_user_created", "user_id", "created_at"),)
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
