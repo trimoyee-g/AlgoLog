@@ -82,6 +82,30 @@ def test_update_creates_attempt_when_problem_has_none(client, db_session):
     assert len(attempts) == 1 and attempts[0].rating == 2
 
 
+def test_update_url_and_platform(client, db_session):
+    pid = client.post("/api/attempts", json=_payload()).json()["problem_id"]
+
+    r = client.patch(f"/api/problems/{pid}",
+                     json={"url": "https://codeforces.com/1a", "platform": "codeforces"})
+    assert r.status_code == 200
+
+    db_session.expire_all()
+    p = db_session.get(Problem, pid)
+    assert p.url == "https://codeforces.com/1a"
+    assert p.platform == Platform.codeforces
+
+
+def test_update_solved_self_alone_leaves_rating_untouched(client, db_session):
+    pid = client.post("/api/attempts", json=_payload(rating=3, solved_self=False)).json()["problem_id"]
+
+    client.patch(f"/api/problems/{pid}", json={"solved_self": True})
+
+    db_session.expire_all()
+    latest = db_session.query(Attempt).filter_by(problem_id=pid).one()
+    assert latest.solved_self is True
+    assert latest.rating == 3  # not reset by the partial update
+
+
 def test_update_url_clash_is_409(client, db_session):
     a = client.post("/api/attempts", json=_payload(url="https://a")).json()["problem_id"]
     client.post("/api/attempts", json=_payload(url="https://b"))
@@ -114,6 +138,18 @@ def test_list_filters_by_platform_tag_rating_and_solved(client, db_session):
     assert len(client.get("/api/problems?min_rating=4").json()) == 1
     assert len(client.get("/api/problems?solved_self=true").json()) == 1
     assert len(client.get("/api/problems?min_rating=4&solved_self=true").json()) == 0
+
+
+def test_list_filters_drop_problems_with_no_attempts(client, db_session):
+    # a problem with no attempt log has no rating to compare against, so any
+    # rating/solved filter must exclude it rather than crash or let it through
+    db_session.add(Problem(user_id=TEST_USER_ID, url="https://x/y", title="T",
+                           platform=Platform.gfg, tags="math"))
+    db_session.commit()
+
+    assert len(client.get("/api/problems").json()) == 1           # unfiltered: still listed
+    assert client.get("/api/problems?min_rating=1").json() == []
+    assert client.get("/api/problems?solved_self=false").json() == []
 
 
 def test_list_min_rating_uses_latest_attempt(client, db_session):

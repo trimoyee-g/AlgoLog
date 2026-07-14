@@ -67,6 +67,19 @@ def test_valid_token_returns_sub_and_creates_user(monkeypatch):
     assert added.email == "new@user.io"
 
 
+def test_unchanged_email_is_not_rewritten(monkeypatch):
+    monkeypatch.setattr(deps._jwks_client, "get_signing_key_from_jwt",
+                        lambda t: MagicMock(key="k"))
+    monkeypatch.setattr(deps.jwt, "decode",
+                        lambda *a, **k: {"sub": "abc-123", "email": "same@user.io"})
+    db = _fake_db(existing_user=MagicMock(email="same@user.io"))
+
+    assert deps.require_user(authorization="Bearer good", db=db) == "abc-123"
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()  # nothing changed -> no write on every request
+
+
 def test_existing_user_email_synced_not_duplicated(monkeypatch):
     monkeypatch.setattr(deps._jwks_client, "get_signing_key_from_jwt",
                         lambda t: MagicMock(key="k"))

@@ -1,0 +1,9 @@
+[run]
+branch = True
+source = app
+
+[report]
+exclude_lines =
+    pragma: no cover
+    # the `python -m app.mcp_server` / `mcp_login` entrypoints: unreachable under pytest
+    if __name__ == .__main__.:

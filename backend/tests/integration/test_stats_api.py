@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models import Problem, Attempt, Platform
-from tests.conftest import TEST_USER_ID
+from app.services.digest import run_weekly_digest
+from tests.conftest import TEST_USER_ID, OTHER_USER_ID
 
 pytestmark = pytest.mark.integration
 
@@ -56,3 +57,24 @@ def test_digest_empty_week_has_default_note(client, db_session):
     body = client.post("/api/stats/digest/send-now").json()
     assert body["stats"]["total"] == 0
     assert "No attempts" in body["note"]
+
+
+def test_weekly_ignores_blank_tags(client, db_session):
+    # a stray or trailing comma must not produce an empty "" topic
+    _seed(db_session, "https://1", Platform.leetcode, "dp,,arrays,", rating=3, solved=True, days_ago=1)
+
+    by_tag = client.get("/api/stats/weekly").json()["by_tag"]
+    assert by_tag == {"dp": 1, "arrays": 1}
+
+
+def test_scheduled_digest_runs_once_per_user(db_session):
+    # the Sunday job fans out over every user; conftest seeds two
+    _seed(db_session, "https://1", Platform.leetcode, "dp", rating=5, solved=True)
+
+    out = run_weekly_digest(db_session)
+
+    assert out["sent"] == 2
+    by_user = {r["user_id"]: r for r in out["results"]}
+    assert by_user[TEST_USER_ID]["stats"]["total"] == 1
+    assert by_user[OTHER_USER_ID]["stats"]["total"] == 0  # scoped: doesn't see the other's attempt
+    assert "No attempts" in by_user[OTHER_USER_ID]["note"]
