@@ -11,6 +11,12 @@ fixtures `pytest.skip`, so `pytest` still passes on a machine with only Python.
 """
 import os
 
+# SUPABASE_PROJECT_URL is a required setting with no default, so it must exist
+# before app.config is imported below. Tests override require_user and never
+# verify a JWT, so this placeholder is never contacted — but setting it here
+# (rather than defaulting it in Settings) keeps a real deploy failing loudly.
+os.environ.setdefault("SUPABASE_PROJECT_URL", "https://example.supabase.co")
+
 import pytest
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
@@ -33,13 +39,23 @@ OTHER_USER_ID = "some-other-user"
 
 
 def _try_make_engine():
-    """Return a ready engine, or None if the test DB can't be reached."""
+    """Return a ready engine, or None if the test DB can't be reached.
+
+    Tests build the schema from the models (fast, and the models are what the
+    tests are about); production builds it from migrations/. The one place the
+    two can disagree is a *drop* — create_all only ever creates, so an object a
+    migration removed lingers in a long-lived test DB. Migration 0002 drops the
+    ivfflat index, so drop it here too.
+    """
     try:
         eng = create_engine(TEST_DATABASE_URL)
         with eng.connect() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
         Base.metadata.create_all(bind=eng)
+        with eng.connect() as conn:
+            conn.execute(text("DROP INDEX IF EXISTS ix_problems_embedding"))
+            conn.commit()
         return eng
     except Exception:  # noqa: BLE001 — any connection/driver error means "skip"
         return None
@@ -88,6 +104,37 @@ def db_session(engine):
         session.close()
         outer.rollback()
         connection.close()
+
+
+@pytest.fixture
+def committing_db(engine):
+    """A session that owns its own transaction — commits really commit.
+
+    `db_session` above wraps the test in an outer transaction and re-savepoints
+    around the app's commits, which is perfect for request handlers but cannot
+    model code that calls `rollback()` itself: the rollback unwinds the fixture's
+    outer transaction too, and the seeded rows vanish mid-test. The weekly digest
+    does exactly that (it rolls back a failed user before releasing their claim),
+    so it gets a session shaped like the one it has in production, and we clean
+    up by truncating afterwards.
+    """
+    if engine is None:
+        pytest.skip("no Postgres+pgvector test DB (set TEST_DATABASE_URL)")
+
+    session = sessionmaker(bind=engine)()
+    session.add_all([
+        User(id=TEST_USER_ID, email="test@example.com"),
+        User(id=OTHER_USER_ID, email="other@example.com"),
+    ])
+    session.commit()
+
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.execute(text("TRUNCATE digest_sends, attempts, problems, users CASCADE"))
+        session.commit()
+        session.close()
 
 
 @pytest.fixture(autouse=True)

@@ -31,7 +31,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zgeymiyigfcyowdyrdln.supabase.co").rstrip("/")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 # The MCP server acts as YOU (whoever runs this instance). It authenticates with
@@ -66,6 +66,8 @@ def _save_refresh_token(token: str) -> None:
 
 async def _refresh() -> None:
     global _access_token, _access_exp
+    if not SUPABASE_URL:
+        raise RuntimeError("Set SUPABASE_URL to your Supabase project URL.")
     refresh_token = _load_refresh_token()
     if not refresh_token:
         raise RuntimeError(

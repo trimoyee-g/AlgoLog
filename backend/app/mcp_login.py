@@ -39,7 +39,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zgeymiyigfcyowdyrdln.supabase.co").rstrip("/")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 CALLBACK_PORT = 8765
 TOKEN_FILE = Path.home() / ".algolog" / "mcp_refresh_token"
 
@@ -89,6 +89,9 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    if not SUPABASE_URL:
+        raise SystemExit("Set SUPABASE_URL to your Supabase project URL, then rerun.")
+
     server = HTTPServer(("localhost", CALLBACK_PORT), _CallbackHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 

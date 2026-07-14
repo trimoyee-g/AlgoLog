@@ -26,6 +26,9 @@ jobs:
 
     env:
       TEST_DATABASE_URL: postgresql+psycopg2://dsa:dsa@localhost:5432/algolog_test
+      # Required by Settings (no default). Never contacted: tests override
+      # require_user, so no JWT is ever verified against it.
+      SUPABASE_PROJECT_URL: https://example.supabase.co
 
     defaults:
       run:

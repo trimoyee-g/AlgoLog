@@ -50,6 +50,7 @@ def _fake_client(response, calls):
 def _isolate(tmp_path, monkeypatch):
     """Point the token file at a temp dir and reset the cached access token, so
     tests never read/write the real ~/.algolog and never leak state into each other."""
+    monkeypatch.setattr(mcp_server, "SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setattr(mcp_server, "_TOKEN_FILE", tmp_path / ".algolog" / "mcp_refresh_token")
     monkeypatch.setattr(mcp_server, "_access_token", None)
     monkeypatch.setattr(mcp_server, "_access_exp", 0.0)

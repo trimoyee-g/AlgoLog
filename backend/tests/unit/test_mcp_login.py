@@ -27,10 +27,19 @@ def _free_port() -> int:
 def _isolate(tmp_path, monkeypatch):
     """Fresh module state per test: own token file, own port, own capture buffers.
     monkeypatch (not .clear()) so a test that swaps _done for a stub still restores."""
+    monkeypatch.setattr(mcp_login, "SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setattr(mcp_login, "TOKEN_FILE", tmp_path / ".algolog" / "mcp_refresh_token")
     monkeypatch.setattr(mcp_login, "CALLBACK_PORT", _free_port())
     monkeypatch.setattr(mcp_login, "_captured", {})
     monkeypatch.setattr(mcp_login, "_done", threading.Event())
+
+
+def test_login_refuses_to_run_without_a_configured_supabase_project(monkeypatch):
+    # No default any more: better to stop than to send the user's OAuth round-trip
+    # to whatever project happened to be baked into the source.
+    monkeypatch.setattr(mcp_login, "SUPABASE_URL", "")
+    with pytest.raises(SystemExit, match="Set SUPABASE_URL"):
+        mcp_login.main()
 
 
 def _browser_that_returns(payload):
