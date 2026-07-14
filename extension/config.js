@@ -5,8 +5,8 @@
 // (promise-capable on the APIs we use in MV3). One handle works on all four.
 const api = globalThis.browser ?? globalThis.chrome;
 
-// Must match frontend/.env. The publishable/anon key is safe to ship in a client.
-const SUPABASE_URL = "https://zgeymiyigfcyowdyrdln.supabase.co"; // no trailing slash
-const SUPABASE_ANON_KEY = "sb_publishable_AUs-POxEqR98ehNHh9eHkA_9Mm9vm7w";
+// The extension never talks to Supabase directly — it only ever reuses the
+// session bridge.js copies over from the dashboard (see auth.js) — so no
+// Supabase URL or key is needed here, just where the backend and dashboard live.
 const BACKEND_URL = "http://localhost:8000";
 const WEBAPP_URL = "http://localhost:5173";
