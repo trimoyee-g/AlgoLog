@@ -14,7 +14,16 @@ def _get_model() -> SentenceTransformer:
     return SentenceTransformer(settings.EMBEDDING_MODEL)
 
 
-def embed_text(text: str) -> list[float]:
+@lru_cache(maxsize=4096)
+def _embed_cached(text: str) -> tuple[float, ...]:
     model = _get_model()
-    vec = model.encode(text, normalize_embeddings=True)
-    return vec.tolist()
+    return tuple(model.encode(text, normalize_embeddings=True).tolist())
+
+
+def embed_text(text: str) -> list[float]:
+    """Embed a tag string. Cached: tag strings ("array,two-pointers") repeat
+    constantly across users, and this runs inline on the POST /api/attempts path.
+
+    Cached as a tuple and copied out, so a caller can't mutate the cache entry.
+    """
+    return list(_embed_cached(text))
