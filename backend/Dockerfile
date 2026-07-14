@@ -11,4 +11,7 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Migrate, then serve. --reload is a dev flag (single worker + filesystem watcher)
+# and has no business in an image other people's users hit; override the command
+# in compose for local development.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

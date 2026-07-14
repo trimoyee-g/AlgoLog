@@ -3,10 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import text
 
 from app.config import settings
-from app.database import Base, engine, SessionLocal
+from app.database import SessionLocal
 from app.routers import attempts, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
 
@@ -23,23 +22,12 @@ def _sunday_digest_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Enable pgvector extension + create tables
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.commit()
-    Base.metadata.create_all(bind=engine)
+    # No DDL here. Schema is owned by Alembic (`alembic upgrade head`, which the
+    # container runs before booting) — create_all() can only ever CREATE, never
+    # ALTER, so it silently no-ops on a schema change once real users' data exists.
 
-    # ANN index for 'find similar' — matches the <=> cosine ops our queries use.
-    # ponytail: lists=100 is fine into the low tens of thousands of rows;
-    # bump toward rows/1000 (and re-create) if search latency ever shows up.
-    with engine.connect() as conn:
-        conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_problems_embedding ON problems "
-            "USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
-        ))
-        conn.commit()
-
-    # Every Sunday at 6pm, send the digest email
+    # Every Sunday at 6pm, send the digest email. Every replica fires this; the
+    # digest_sends claim table makes the send itself at-most-once per user/week.
     scheduler.add_job(_sunday_digest_job, "cron", day_of_week="sun", hour=18, minute=0)
     scheduler.start()
 
