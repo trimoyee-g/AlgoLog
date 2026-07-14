@@ -9,6 +9,12 @@ these tools against your own backend.
 This talks to the FastAPI backend over HTTP rather than the DB directly,
 so it stays a thin client and the backend remains the single source of truth.
 
+First-time setup:
+    python -m app.mcp_login
+This logs the MCP server in independently (its own OAuth round-trip, not a
+copy of your dashboard's live session -- see mcp_login.py for why that
+distinction matters) and saves the resulting refresh token locally.
+
 Run:
     python -m app.mcp_server
 Then point Claude Desktop's config at this script (see README for the
@@ -29,11 +35,15 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zgeymiyigfcyowdyrdln.supa
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 # The MCP server acts as YOU (whoever runs this instance). It authenticates with
-# your personal Supabase refresh token and mints short-lived access tokens, exactly
-# like the web app / extension do. Supabase ROTATES the refresh token on each use,
-# so we persist the latest one to a local file — otherwise it'd break on restart.
-# First run seeds from the SUPABASE_REFRESH_TOKEN env var (grab it once from the
-# web app's localStorage after logging in).
+# its own Supabase refresh token -- established once via `python -m app.mcp_login`,
+# deliberately independent of whatever session your dashboard browser tab is using
+# (see mcp_login.py's docstring) -- and mints short-lived access tokens from it.
+# Supabase ROTATES the refresh token on each use, so we persist the latest one to
+# a local file; since this lineage was never shared with the browser, rotating it
+# here never invalidates the dashboard's session, or vice versa.
+# Falls back to the SUPABASE_REFRESH_TOKEN env var if the file doesn't exist yet,
+# for anyone who obtained an independent token some other way (e.g. CI, or a future
+# multi-user token-issuance flow) -- but the normal path is `mcp_login.py`.
 _TOKEN_FILE = Path.home() / ".algolog" / "mcp_refresh_token"
 
 mcp = FastMCP("algolog")
@@ -59,9 +69,9 @@ async def _refresh() -> None:
     refresh_token = _load_refresh_token()
     if not refresh_token:
         raise RuntimeError(
-            "No Supabase refresh token. Set SUPABASE_REFRESH_TOKEN once (copy it from "
-            "the web app's localStorage after logging in), then this server persists "
-            "the rotated tokens itself."
+            "No Supabase session for the MCP server. Run `python -m app.mcp_login` "
+            "once to log in independently -- this server then persists and rotates "
+            "the resulting token itself."
         )
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
