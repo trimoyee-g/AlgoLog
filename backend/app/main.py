@@ -6,10 +6,15 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.config import settings
 from app.database import SessionLocal
-from app.routers import attempts, review, similarity, stats_router
+from app.mcp_http import mcp as mcp_server
+from app.routers import attempts, chat, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
 
 scheduler = BackgroundScheduler()
+
+# Build the MCP ASGI app at import: FastMCP creates its session manager lazily inside
+# streamable_http_app(), and `mcp_server.session_manager` raises until it has been called.
+mcp_app = mcp_server.streamable_http_app()
 
 
 def _sunday_digest_job():
@@ -31,7 +36,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_sunday_digest_job, "cron", day_of_week="sun", hour=18, minute=0)
     scheduler.start()
 
-    yield
+    # A mounted sub-app's own lifespan never fires, so the MCP session manager has to
+    # be started here or every /mcp request fails with "task group is not initialized".
+    async with mcp_server.session_manager.run():
+        yield
 
     scheduler.shutdown()
 
@@ -47,6 +55,7 @@ app.add_middleware(
 )
 
 app.include_router(attempts.router)
+app.include_router(chat.router)
 app.include_router(review.router)
 app.include_router(similarity.router)
 app.include_router(stats_router.router)
@@ -55,3 +64,10 @@ app.include_router(stats_router.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Mounted at the root, and last: routes declared above win, and the OAuth
+# protected-resource metadata the MCP client discovers has to live at
+# /.well-known/... — mounting under /mcp would bury it a level down where no
+# client looks. Serves POST /mcp (Streamable HTTP) plus that metadata document.
+app.mount("/", mcp_app)

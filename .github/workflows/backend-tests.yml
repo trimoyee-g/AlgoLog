@@ -29,6 +29,7 @@ jobs:
       # Required by Settings (no default). Never contacted: tests override
       # require_user, so no JWT is ever verified against it.
       SUPABASE_PROJECT_URL: https://example.supabase.co
+      MCP_PUBLIC_URL: http://localhost:8000
 
     defaults:
       run:

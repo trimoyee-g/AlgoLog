@@ -1,10 +1,10 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
+uvicorn[standard]==0.34.0   # mcp>=1.28 requires >=0.31.1
 sqlalchemy==2.0.35
 alembic==1.13.2
 psycopg2-binary==2.9.9
 pgvector==0.3.4
-pydantic==2.10.6          
+pydantic==2.11.7          # mcp>=1.28 requires >=2.11
 pydantic-settings==2.6.1  
 python-dotenv==1.0.1
 sentence-transformers==3.1.1
@@ -12,7 +12,10 @@ torch==2.4.1
 transformers==4.44.2
 httpx==0.27.2
 apscheduler==3.10.4
-mcp==1.2.1 
+mcp==1.28.1   # 1.2.1 has no streamable-http transport (stdio|sse only) and no TokenVerifier
 python-multipart==0.0.12
-pyjwt==2.9.0
+pyjwt==2.10.1   # mcp>=1.28 requires >=2.10.1
 cryptography==43.0.1
+langchain-ollama==0.2.3   # optional weekly-digest enrichment + chat agent, via local Ollama
+ddgs==9.0.0               # keyless web search for the digest's problem suggestions
+langgraph==0.2.60         # ReAct chat agent (create_react_agent) over the service layer

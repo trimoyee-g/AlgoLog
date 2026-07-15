@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Attempt, DigestSend, Problem, User
+from app.services.digest_enrich import enrich, render_enrichment
 from app.services.recommend import review_queue, weak_topics
 
 log = logging.getLogger(__name__)
@@ -105,6 +106,9 @@ def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
     due = review_queue(db, user_id, due_only=True)[:5]
     note = digest_note(stats, last_week, weak)
     body = render_digest(stats, due, note)
+    extra = enrich(stats, weak)  # best-effort; None when disabled or on any failure
+    if extra:
+        body += "\n" + render_enrichment(extra)
     user = db.get(User, user_id)
     send_email(user.email if user else "", "Your weekly DSA progress digest", body)
     return {"stats": stats, "due": due, "note": note}

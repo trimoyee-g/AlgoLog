@@ -8,7 +8,8 @@ Log every LeetCode / Codeforces / CodeChef / AtCoder / GFG problem you attempt w
 difficulty score and an honest "did I actually solve this myself?" flag. AlgoLog finds
 problems similar to ones you struggled with, tracks how much you solve unaided, resurfaces
 weak problems on a spaced-repetition schedule, and emails you a weekly digest — all running
-locally, with no LLM and no API keys.
+locally, with no cloud API keys. An **optional local LLM** (Ollama) adds a dashboard chat
+coach and enriches the digest — off by default, and the core stays deterministic either way.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -47,15 +48,23 @@ AlgoLog is a personal practice tracker with three ways in and one brain behind t
   you just made (1–5 difficulty, solved-yourself yes/no, tags, notes). The platform is
   inferred from the tab URL.
 - **React dashboard** — add and edit problems, filter your history, find similar problems,
-  work the spaced-repetition review queue, and trigger the weekly digest on demand.
+  work the spaced-repetition review queue, trigger the weekly digest on demand, and (if a
+  local LLM is configured) chat with a **coach agent** that reasons over your own data.
 - **MCP server** — ask Claude Desktop or Claude Code *"what should I revisit next?"* and let
   it call your own tracker as tools, including a recommender that reasons over your data
   rather than just fetching it.
 
-Everything runs locally: embeddings are computed in-process via `sentence-transformers`, and
-the review scheduler, weak-topic detection, and weekly digest are deterministic rules — no
-LLM anywhere in the loop. Auth is delegated to **Supabase** (JWT), so data is per-user and
-the backend never stores a password.
+The core runs locally with no cloud keys: embeddings are computed in-process via
+`sentence-transformers`, and the review scheduler, weak-topic detection, and the digest's
+recommendation are deterministic rules — every suggestion stays reproducible. Auth is
+delegated to **Supabase** (JWT), so data is per-user and the backend never stores a password.
+
+**Optional local LLM (Ollama).** Set `OLLAMA_MODEL` and two features light up, both degrading
+cleanly to the deterministic path when it's unset or unreachable: a dashboard **chat coach**
+(a LangGraph ReAct agent over the same functions the MCP server exposes) and **digest
+enrichment** (LangChain + a keyless web search that appends a personalized paragraph, study
+tips, and fresh practice problems). Nothing leaves your machine — the model runs in a
+local Ollama container.
 
 ---
 
@@ -104,6 +113,8 @@ the backend never stores a password.
 | **Weak-topic detection** | Per tag, the recent (90-day) solved-unaided rate. A tag is "weak" below 50% *and* with ≥3 attempts, so one bad problem never brands a topic weak forever. |
 | **Recommend next** | Merges due-for-review and weak topics into one ranked suggestion — `high` priority means overdue **and** a weak topic — each carrying a plain-English `reason` string. |
 | **Weekly digest** | An APScheduler job emails a Sunday summary over SMTP: week stats with a week-over-week trend, the top-5 due-for-review problems, and a templated coach note built from simple conditionals. Also triggerable on demand from the dashboard. |
+| **Digest enrichment** *(optional LLM)* | When `OLLAMA_MODEL` is set, a best-effort layer appends a personalized paragraph, 4–5 study tips, and 4–5 web-searched practice problems. Search (keyless `ddgs`) is deterministic; the local LLM only writes and curates the real URLs. Any failure falls back to the plain digest — the email always sends. |
+| **Chat coach** *(optional LLM)* | A dashboard chat widget backed by a LangGraph ReAct agent. It calls the same functions as the MCP tools (weak problems, weak topics, recommendation) to ground every answer in your data — ask *"what should I grind this weekend?"*. Disabled (503) until `OLLAMA_MODEL` is set. |
 | **MCP tools** | Query the tracker from any MCP client — weak problems, overall stats, and the reasoned "recommend next problem". |
 
 ---
@@ -122,6 +133,7 @@ the backend never stores a password.
 | Embeddings | `sentence-transformers` — `all-MiniLM-L6-v2` (384-dim, local) |
 | Recall scheduling | SM-2 variant derived from the attempt log; weak-topic and recommend are plain deterministic Python |
 | Scheduler | APScheduler (weekly email digest) |
+| Optional LLM | [Ollama](https://ollama.com) (local, containerized) via `langchain-ollama`; chat coach on `langgraph` (`create_react_agent`); digest web search via keyless `ddgs` |
 | MCP | `mcp` 1.2 (`FastMCP`) — stdio server proxying the REST API |
 
 ### Frontend
@@ -163,10 +175,35 @@ shows a login prompt that opens the dashboard; logging in there syncs back autom
 
 ```bash
 # from the repo root
-cp backend/.env.example backend/.env
-# edit backend/.env: set SUPABASE_PROJECT_URL, and SMTP_* if you want the weekly email
+cp .env.example .env
+# edit .env: Postgres user/password/db. No defaults — compose won't start without them.
 
-docker compose up -d --build
+cp backend/.env.example backend/.env
+# edit backend/.env: set SUPABASE_PROJECT_URL (required), and SMTP_* if you want the weekly email
+
+docker compose up -d --build   # runs `alembic upgrade head`, then serves
+```
+
+Compose also starts a local **Ollama** service (for the optional chat coach and digest
+enrichment). To turn those on, pull a tool-capable model once and set `OLLAMA_MODEL`:
+
+```bash
+docker compose exec ollama ollama pull llama3.1   # ~4.7GB, one-time
+# then set OLLAMA_MODEL=llama3.1 in backend/.env and:
+docker compose up -d backend
+```
+
+Leave `OLLAMA_MODEL` empty and the LLM features stay off — everything else works unchanged.
+
+The schema is owned by Alembic, not by the app. The container migrates on boot; to
+run one by hand: `docker compose exec backend alembic upgrade head`.
+
+**Upgrading a deployment that predates migrations** (its tables were made by the old
+`create_all`): adopt the baseline once, then migrate forward.
+
+```bash
+docker compose exec backend alembic stamp 0001
+docker compose exec backend alembic upgrade head
 ```
 
 Verify: `http://localhost:8000/health` → `{"status":"ok"}`
@@ -226,6 +263,12 @@ All endpoints require `Authorization: Bearer <supabase-jwt>`. Base URL `http://l
 | GET | `/weak-topics` | Tags whose recent solved-unaided rate is below threshold, with enough samples |
 | GET | `/recommend?count=1` | Ranked "what to do next" — due reviews + weak topics, each with a `reason` and `priority` |
 | POST | `/digest/send-now` | Send your weekly email digest immediately |
+
+### Chat coach — `/api/chat` *(optional LLM)*
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/chat` | Chat with the coach agent. Body `{ "message": str, "history": [{role, content}] }` → `{ "reply": str }`. Runs a LangGraph ReAct loop over the local Ollama model. Returns **503** when `OLLAMA_MODEL` is unset. |
 
 Health check: `GET /health` · Interactive docs: `http://localhost:8000/docs`
 
@@ -291,12 +334,17 @@ Backend — `backend/.env`:
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `postgresql+psycopg2://dsa:dsa@localhost:5432/algolog` | Postgres + pgvector connection (docker-compose overrides the host to `postgres`) |
-| `SUPABASE_PROJECT_URL` | — | Your Supabase project URL; its `/auth/v1/.well-known/jwks.json` endpoint verifies tokens |
+| `SUPABASE_PROJECT_URL` | **required** | Your Supabase project URL; its `/auth/v1/.well-known/jwks.json` endpoint verifies tokens. No default: the backend refuses to boot without it, rather than verifying your users' tokens against someone else's project. |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS origin for the dashboard |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model |
-| `EMBEDDING_DIM` | `384` | Embedding dimension (must match the model) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Gmail host/port, empty creds | Weekly digest email; use a Gmail App Password. Empty credentials disable email. |
-| `DIGEST_TO_EMAIL` | _(empty)_ | Fallback recipient; the scheduled job otherwise emails each user's own address |
+| `EMBEDDING_DIM` | `384` | Embedding dimension (must match the model; changing it needs a migration to rewrite the column) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Gmail host/port, empty creds | Weekly digest, sent to each user's own address; use a Gmail App Password. Empty credentials disable email. Gmail caps ~500 recipients/day — past a few hundred users, point this at a transactional sender. |
+| `OLLAMA_MODEL` | empty (disabled) | Local Ollama model for the chat coach and digest enrichment. Must be **tool-capable** for chat (e.g. `llama3.1`). Empty leaves both features off and the core deterministic. Pull it first: `docker compose exec ollama ollama pull llama3.1`. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint. docker-compose overrides this to `http://ollama:11434` (the service name); only set it by hand when running the backend outside compose. |
+
+Compose — `.env` at the repo root (read by `docker-compose.yml`, **not** by the app):
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`. No defaults, so an unset secret
+fails loudly instead of silently booting on a well-known password.
 
 Frontend — `frontend/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and optional
 `VITE_BACKEND_URL`.
@@ -354,8 +402,9 @@ the whole suite with coverage on every push and PR.
 │       ├── schemas.py          # Pydantic DTOs
 │       ├── mcp_server.py       # FastMCP stdio server
 │       ├── mcp_login.py        # One-time OAuth login to seed the MCP refresh token
-│       ├── routers/            # attempts · similarity · stats_router · review
+│       ├── routers/            # attempts · similarity · stats_router · review · chat
 │       └── services/           # embeddings · scheduler (SM-2) · recommend · digest
+│                               #   · digest_enrich (Ollama+web search) · agent (LangGraph)
 │
 ├── extension/                  # MV3 browser extension (popup rating + session bridge)
 │   ├── manifest.json
@@ -370,7 +419,7 @@ the whole suite with coverage on every push and PR.
 └── frontend/                   # React + Vite + TS dashboard  (port 5173)
     └── src/
         ├── pages/              # Landing · Login · Dashboard · Review
-        ├── components/         # Cards, dialogs, filters, charts, ui/ (shadcn)
+        ├── components/         # Cards, dialogs, filters, charts, ChatWidget, ui/ (shadcn)
         └── lib/                # api.ts (JWT interceptor) · supabase.ts · types
 ```
 
@@ -378,12 +427,15 @@ the whole suite with coverage on every push and PR.
 
 ## Key Design Decisions
 
-**A deterministic coach, not an LLM.** The review scheduler, weak-topic detection, and the
-digest coach note are plain rules. Every suggestion is reproducible and debuggable — you can
-always answer *"why is this due?"* or *"why is dp flagged weak?"* — which is the right trade
-for a feature you rely on to guide practice. Embeddings run in-process via
-`sentence-transformers`, so there are no API keys, no per-call cost, and no data leaving the
-machine.
+**A deterministic core, with the LLM as an optional topping.** The review scheduler,
+weak-topic detection, and the digest's recommendation are plain rules. Every suggestion is
+reproducible and debuggable — you can always answer *"why is this due?"* or *"why is dp
+flagged weak?"* — which is the right trade for a feature you rely on to guide practice. The
+optional LLM never replaces that logic: the chat coach only *reads* it through the same
+functions the MCP tools expose, and digest enrichment only *appends* to an already-complete
+email, falling back to the templated note on any failure. With `OLLAMA_MODEL` unset the
+system is exactly the deterministic tracker it was — and even when set, the model is a local
+Ollama container, so there are still no cloud API keys and no data leaving the machine.
 
 **The SM-2 schedule stores no state.** Interval, ease, and repetitions are derived by folding
 SM-2 over a problem's immutable attempt log, so a review is just another logged attempt and

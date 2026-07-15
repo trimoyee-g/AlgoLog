@@ -21,6 +21,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional local LLM for the weekly-digest enrichment. Backend reaches it at
+  # http://ollama:11434 (set below). The model isn't bundled — pull it once:
+  #   docker compose exec ollama ollama pull llama3.1
+  # For GPU, uncomment the deploy block (needs the nvidia container runtime).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: algolog-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
   backend:
     build: ./backend
     container_name: algolog-backend
@@ -29,6 +49,8 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Override the localhost default so the backend reaches the ollama service.
+      OLLAMA_BASE_URL: http://ollama:11434
     # Local dev: migrate, then serve with the reload watcher the image deliberately omits.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
@@ -36,8 +58,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     volumes:
       - ./backend:/app
 
 volumes:
   pgdata:
+  ollama:

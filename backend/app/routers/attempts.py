@@ -8,6 +8,7 @@ from app.deps import require_user
 from app.models import Problem, Attempt, Platform
 from app.schemas import AttemptCreate, ProblemOut, ProblemUpdate
 from app.services.embeddings import embed_text
+from app.services.problems import list_problems
 
 router = APIRouter(prefix="/api", tags=["attempts"])
 
@@ -108,7 +109,7 @@ def delete_problem(problem_id: int, db: Session = Depends(get_db),
 
 
 @router.get("/problems", response_model=list[ProblemOut])
-def list_problems(
+def get_problems(
     min_rating: Optional[int] = Query(default=None, ge=1, le=5),
     solved_self: Optional[bool] = Query(default=None),
     platform: Optional[str] = Query(default=None),
@@ -117,25 +118,7 @@ def list_problems(
     user_id: str = Depends(require_user),
 ):
     """Filterable list, e.g. GET /api/problems?min_rating=4&solved_self=false"""
-    q = db.query(Problem).options(joinedload(Problem.attempts)).filter(Problem.user_id == user_id)
-    if platform:
-        q = q.filter(Problem.platform == Platform(platform))
-    if tag:
-        q = q.filter(Problem.tags.ilike(f"%{tag}%"))
-
-    problems = q.all()
-
-    def latest_matches(p: Problem) -> bool:
-        if not p.attempts:
-            return False
-        latest = max(p.attempts, key=lambda a: a.created_at)
-        if min_rating is not None and latest.rating < min_rating:
-            return False
-        if solved_self is not None and latest.solved_self != solved_self:
-            return False
-        return True
-
-    if min_rating is not None or solved_self is not None:
-        problems = [p for p in problems if latest_matches(p)]
-
-    return problems
+    return list_problems(
+        db, user_id,
+        min_rating=min_rating, solved_self=solved_self, platform=platform, tag=tag,
+    )

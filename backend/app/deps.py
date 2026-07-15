@@ -16,33 +16,24 @@ _jwks_client = PyJWKClient(
 )
 
 
-def require_user(
-    authorization: str = Header(default=""),
-    db: Session = Depends(get_db),
-) -> str:
-    """Verify the Supabase-issued JWT and return the user's id (the `sub` claim).
+def verify_supabase_jwt(token: str) -> dict:
+    """Verify a Supabase-issued JWT and return its claims. Raises jwt.PyJWTError.
 
-    Also upserts the user row so the weekly digest knows their email.
+    Shared with the hosted MCP server (app/mcp_http.py), which authenticates the
+    same tokens over a different transport — one place decides what a valid
+    AlgoLog identity is.
     """
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-    token = authorization[len("Bearer "):]
-    try:
-        signing_key = _jwks_client.get_signing_key_from_jwt(token)
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["ES256", "RS256"],
-            audience="authenticated",
-        )
-    except jwt.PyJWTError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+    signing_key = _jwks_client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["ES256", "RS256"],
+        audience="authenticated",
+    )
 
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token missing sub claim")
-    email = payload.get("email", "")
 
+def sync_user(db: Session, user_id: str, email: str) -> None:
+    """Upsert the user row so the weekly digest knows their email."""
     user = db.get(User, user_id)
     if user is None:
         db.add(User(id=user_id, email=email))
@@ -51,4 +42,23 @@ def require_user(
         user.email = email
         db.commit()
 
+
+def require_user(
+    authorization: str = Header(default=""),
+    db: Session = Depends(get_db),
+) -> str:
+    """Verify the Supabase-issued JWT and return the user's id (the `sub` claim)."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    token = authorization[len("Bearer "):]
+    try:
+        payload = verify_supabase_jwt(token)
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token missing sub claim")
+
+    sync_user(db, user_id, payload.get("email", ""))
     return user_id
