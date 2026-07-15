@@ -11,6 +11,7 @@ import { AddProblemCard } from "@/components/AddProblemCard";
 import { FiltersBar, type FilterDraft } from "@/components/FiltersBar";
 import { ProblemsTable } from "@/components/ProblemsTable";
 import { ReviewPanel } from "@/components/ReviewPanel";
+import { ChatWidget } from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -155,6 +156,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <ChatWidget />
     </div>
   );
 }

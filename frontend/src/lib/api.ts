@@ -101,3 +101,15 @@ export function sendDigestNow() {
     method: "POST",
   });
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export function sendChat(message: string, history: ChatMessage[]) {
+  return request<{ reply: string }>("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+  });
+}
