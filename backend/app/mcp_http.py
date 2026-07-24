@@ -33,9 +33,9 @@ from pydantic import AnyHttpUrl
 from app.config import settings
 from app.database import SessionLocal
 from app.deps import sync_user, verify_supabase_jwt
-from app.models import Attempt, Problem
 from app.services.problems import list_problems
 from app.services.recommend import recommend
+from app.services.stats import overview_stats
 
 
 class SupabaseTokenVerifier(TokenVerifier):
@@ -124,19 +124,10 @@ async def get_weak_problems(
 
 @mcp.tool()
 async def get_stats_overview() -> dict:
-    """Overall practice stats: total problems, attempts, solved-unaided, hard-rated."""
+    """Overall practice stats: total problems, attempts, solved-unaided, hard-rated,
+    and unaided_rate (0-1)."""
     user_id = _caller()
-
-    def stats(db):
-        attempts = db.query(Attempt).filter(Attempt.user_id == user_id)
-        return {
-            "total_problems": db.query(Problem).filter(Problem.user_id == user_id).count(),
-            "total_attempts": attempts.count(),
-            "solved_self_count": attempts.filter(Attempt.solved_self.is_(True)).count(),
-            "hard_rated_count": attempts.filter(Attempt.rating >= 4).count(),
-        }
-
-    return await _query(stats)
+    return await _query(lambda db: overview_stats(db, user_id))
 
 
 @mcp.tool()

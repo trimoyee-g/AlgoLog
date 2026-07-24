@@ -82,11 +82,26 @@ export interface ProblemFilters {
   tag?: string;
 }
 
+/** `/api/stats/recommend` — the ranked pick, with the reason the backend already builds. */
+export type Priority = "high" | "medium" | "low";
+
+export interface Recommendation {
+  problem_id: number;
+  problem: string;
+  url: string;
+  tags: string | null;
+  reason: string;
+  priority: Priority;
+  overdue_days: number;
+  due: string;
+}
+
 export interface ReviewItem {
   id: number;
   url: string;
   title: string;
   platform: Platform;
+  priority: Priority;
   tags: string | null;
   interval_days: number;
   ease: number;

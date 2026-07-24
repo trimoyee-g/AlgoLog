@@ -11,5 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Backend CORS pins this exact origin; drifting to 5174 breaks every /api call.
+    strictPort: true,
   },
 });

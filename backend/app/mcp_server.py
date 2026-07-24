@@ -122,7 +122,8 @@ async def get_weak_problems(
 
 @mcp.tool()
 async def get_stats_overview() -> str:
-    """Get overall practice stats: total problems, total attempts, solved-unaided count, hard-rated count."""
+    """Get overall practice stats: total problems, total attempts, solved-unaided count,
+    hard-rated count, and unaided_rate (0-1). Use for any question about totals or solve/unaided rate."""
     return await _get("/api/stats/overview")
 
 

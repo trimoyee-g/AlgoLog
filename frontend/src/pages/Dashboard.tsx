@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Brain, Home, Plus } from "lucide-react";
@@ -11,7 +10,6 @@ import { AddProblemCard } from "@/components/AddProblemCard";
 import { FiltersBar, type FilterDraft } from "@/components/FiltersBar";
 import { ProblemsTable } from "@/components/ProblemsTable";
 import { ReviewPanel } from "@/components/ReviewPanel";
-import { ChatWidget } from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Reveal } from "@/components/motion/Reveal";
 import { GlowOrb } from "@/components/motion/ParallaxLayer";
-import { getOverview, listProblems, sendDigestNow } from "@/lib/api";
+import { DigestDialog } from "@/components/DigestDialog";
+import { getOverview, listProblems } from "@/lib/api";
 import type { ProblemFilters } from "@/lib/types";
 
 const emptyDraft: FilterDraft = {
@@ -44,20 +43,13 @@ export default function Dashboard() {
   const [draft, setDraft] = useState<FilterDraft>(emptyDraft);
   const [appliedFilters, setAppliedFilters] = useState<ProblemFilters>({});
   const [addOpen, setAddOpen] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const overviewQuery = useQuery({ queryKey: ["overview"], queryFn: getOverview });
   const problemsQuery = useQuery({
     queryKey: ["problems", appliedFilters],
     queryFn: () => listProblems(appliedFilters),
-  });
-
-  const digestMutation = useMutation({
-    mutationFn: sendDigestNow,
-    onSuccess: (data) => {
-      toast.success(data.note ?? "Digest sent — check your inbox.");
-    },
-    onError: (err: Error) => toast.error(`Digest failed: ${err.message}`),
   });
 
   const problems = problemsQuery.data ?? [];
@@ -107,6 +99,8 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
+      <DigestDialog open={digestOpen} onOpenChange={setDigestOpen} />
+
       <div className="relative overflow-hidden">
         <GlowOrb
           speed={0.15}
@@ -145,8 +139,7 @@ export default function Dashboard() {
                   setAppliedFilters(draftToFilters(draft));
                   queryClient.invalidateQueries({ queryKey: ["problems"] });
                 }}
-                onDigest={() => digestMutation.mutate()}
-                digestPending={digestMutation.isPending}
+                onDigest={() => setDigestOpen(true)}
               />
             </Reveal>
 
@@ -156,8 +149,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      <ChatWidget />
     </div>
   );
 }

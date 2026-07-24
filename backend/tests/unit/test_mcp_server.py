@@ -88,6 +88,14 @@ def test_refresh_without_a_session_points_at_mcp_login():
         asyncio.run(mcp_server._refresh())
 
 
+def test_refresh_without_a_supabase_url_says_so(monkeypatch):
+    """Fails on the missing setting rather than posting to a URL built from "" ."""
+    monkeypatch.setattr(mcp_server, "SUPABASE_URL", "")
+
+    with pytest.raises(RuntimeError, match="Set SUPABASE_URL"):
+        asyncio.run(mcp_server._refresh())
+
+
 def test_refresh_raises_on_a_non_200_from_supabase(monkeypatch):
     mcp_server._save_refresh_token("rt-1")
     monkeypatch.setattr(mcp_server.httpx, "AsyncClient",

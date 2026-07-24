@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Attempt, DigestSend, Problem, User
 from app.services.digest_enrich import enrich, render_enrichment
-from app.services.recommend import review_queue, weak_topics
+from app.services.recommend import review_queue, topic_rates, weak_topics
 
 log = logging.getLogger(__name__)
 
@@ -98,7 +98,8 @@ def send_email(to_email: str, subject: str, body: str) -> None:
         server.send_message(msg)
 
 
-def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
+def build_digest_for_user(db: Session, user_id: str) -> dict:
+    """Everything the digest email says, without sending it."""
     now = datetime.utcnow()
     stats = build_weekly_stats(db, user_id)
     last_week = _stats_window(db, user_id, now - timedelta(days=14), now - timedelta(days=7))
@@ -106,12 +107,20 @@ def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
     due = review_queue(db, user_id, due_only=True)[:5]
     note = digest_note(stats, last_week, weak)
     body = render_digest(stats, due, note)
-    extra = enrich(stats, weak)  # best-effort; None when disabled or on any failure
+    # best-effort; None when disabled or on any failure. The 90-day rates are the
+    # fallback that keeps a zero-attempt week from silently dropping the coach.
+    extra = enrich(stats, weak, topic_rates(db, user_id))
     if extra:
         body += "\n" + render_enrichment(extra)
+    return {"stats": stats, "due": due, "note": note, "body": body}
+
+
+def run_weekly_digest_for_user(db: Session, user_id: str) -> dict:
+    digest = build_digest_for_user(db, user_id)
+    body = digest.pop("body")  # emailed, not echoed back — see /digest/preview for the text
     user = db.get(User, user_id)
     send_email(user.email if user else "", "Your weekly DSA progress digest", body)
-    return {"stats": stats, "due": due, "note": note}
+    return digest
 
 
 def iso_week(now: datetime) -> str:

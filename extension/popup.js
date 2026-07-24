@@ -46,6 +46,7 @@ document.getElementById("loginBtn").addEventListener("click", () => {
 
 document.getElementById("save").addEventListener("click", async () => {
   const statusEl = document.getElementById("status");
+  const saveBtn = document.getElementById("save");
   if (!rating || solvedSelf === null) {
     statusEl.textContent = "Pick a rating and yes/no first.";
     return;
@@ -58,6 +59,10 @@ document.getElementById("save").addEventListener("click", async () => {
   const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   const notes = document.getElementById("notes").value;
   const title = document.getElementById("title").value.trim() || tab.title;
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+  statusEl.textContent = "";
 
   try {
     const resp = await fetch(`${BACKEND_URL}/api/attempts`, {
@@ -89,6 +94,9 @@ document.getElementById("save").addEventListener("click", async () => {
     }
   } catch (e) {
     statusEl.textContent = "Backend unreachable at localhost:8000.";
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "+ Add problem";
   }
 });
 

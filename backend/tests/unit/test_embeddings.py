@@ -36,6 +36,20 @@ def test_embed_text_requests_normalized_embeddings(monkeypatch):
     assert kwargs.get("normalize_embeddings") is True
 
 
+def test_tag_order_and_case_do_not_change_the_vector(monkeypatch):
+    emb._embed_cached.cache_clear()
+    model = MagicMock()
+    model.encode.return_value = np.array([0.5, 0.5])
+    monkeypatch.setattr(emb, "SentenceTransformer", lambda name: model)
+
+    a = emb.embed_text("dp, hashmap")
+    b = emb.embed_text("HashMap,dp")
+
+    assert a == b
+    assert model.encode.call_count == 1  # second call served from cache
+    assert model.encode.call_args[0][0] == "dp,hashmap"
+
+
 def test_model_is_loaded_once_and_cached(monkeypatch):
     calls = {"n": 0}
 

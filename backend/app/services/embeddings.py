@@ -20,10 +20,18 @@ def _embed_cached(text: str) -> tuple[float, ...]:
     return tuple(model.encode(text, normalize_embeddings=True).tolist())
 
 
+def _canon(text: str) -> str:
+    """Order/case/spacing-insensitive tag key: "DP, hashmap" == "hashmap,dp"."""
+    return ",".join(sorted({t.strip().lower() for t in text.split(",") if t.strip()}))
+
+
 def embed_text(text: str) -> list[float]:
-    """Embed a tag string. Cached: tag strings ("array,two-pointers") repeat
-    constantly across users, and this runs inline on the POST /api/attempts path.
+    """Embed a tag string. Canonicalised first, so two spellings of the same tag
+    set get the same vector (and the same cache entry).
+
+    Cached: tag strings ("array,two-pointers") repeat constantly across users,
+    and this runs inline on the POST /api/attempts path.
 
     Cached as a tuple and copied out, so a caller can't mutate the cache entry.
     """
-    return list(_embed_cached(text))
+    return list(_embed_cached(_canon(text)))

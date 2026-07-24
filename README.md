@@ -2,19 +2,16 @@
 
 # AlgoLog
 
-**Self-rate competitive-programming submissions, revisit what didn't stick.**
+**Self-rate your CP submissions, revisit what didn't stick.**
 
 Log every LeetCode / Codeforces / CodeChef / AtCoder / GFG problem you attempt with a 1–5
 difficulty score and an honest "did I actually solve this myself?" flag. AlgoLog finds
-problems similar to ones you struggled with, tracks how much you solve unaided, resurfaces
-weak problems on a spaced-repetition schedule, and emails you a weekly digest — all running
-locally, with no cloud API keys. An **optional local LLM** (Ollama) adds a dashboard chat
-coach and enriches the digest — off by default, and the core stays deterministic either way.
+problems similar to ones you struggled with, resurfaces weak ones on a spaced-repetition
+schedule, and emails a weekly digest — no cloud API keys, no data leaving your machine.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-blue?style=flat-square&logo=react)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
 [![Postgres](https://img.shields.io/badge/PostgreSQL-16%20+%20pgvector-336791?style=flat-square&logo=postgresql)](https://github.com/pgvector/pgvector)
 [![MCP](https://img.shields.io/badge/MCP-server-purple?style=flat-square)](https://modelcontextprotocol.io)
 [![backend-tests](https://github.com/trimoyee-g/AlgoLog/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/trimoyee-g/AlgoLog/actions/workflows/backend-tests.yml)
@@ -23,286 +20,173 @@ coach and enriches the digest — off by default, and the core stays determinist
 
 ---
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [API Reference](#api-reference)
-- [MCP Server](#mcp-server)
-- [Environment Variables](#environment-variables)
-- [Testing](#testing)
-- [Project Structure](#project-structure)
-- [Key Design Decisions](#key-design-decisions)
-- [Contributing](#contributing)
-
----
-
 ## Overview
 
-AlgoLog is a personal practice tracker with three ways in and one brain behind them:
+Three ways in, one brain behind them:
 
-- **Browser extension** — click the toolbar icon on any problem page to rate the submission
-  you just made (1–5 difficulty, solved-yourself yes/no, tags, notes). The platform is
-  inferred from the tab URL.
-- **React dashboard** — add and edit problems, filter your history, find similar problems,
-  work the spaced-repetition review queue, trigger the weekly digest on demand, and (if a
-  local LLM is configured) chat with a **coach agent** that reasons over your own data.
-- **MCP server** — ask Claude Desktop or Claude Code *"what should I revisit next?"* and let
-  it call your own tracker as tools, including a recommender that reasons over your data
-  rather than just fetching it.
+- **Browser extension** — click the toolbar icon on a problem page and rate the submission
+  you just made. The platform is inferred from the tab URL.
+- **React dashboard** — add, edit, and filter problems, find similar ones, work the review
+  queue, and see what to revisit next with the reason it was picked.
+- **MCP server** — ask Claude _"what should I revisit next?"_ and let it call your tracker
+  as tools.
 
-The core runs locally with no cloud keys: embeddings are computed in-process via
-`sentence-transformers`, and the review scheduler, weak-topic detection, and the digest's
-recommendation are deterministic rules — every suggestion stays reproducible. Auth is
-delegated to **Supabase** (JWT), so data is per-user and the backend never stores a password.
+Everything that guides your practice is deterministic: embeddings run in-process via
+`sentence-transformers`, and the SM-2 scheduler, weak-topic detection, and recommender are
+plain rules — so every suggestion is reproducible. Auth is delegated to Supabase (JWT); the
+backend verifies tokens against the project JWKS and never stores a password.
 
-**Optional local LLM (Ollama).** Set `OLLAMA_MODEL` and two features light up, both degrading
-cleanly to the deterministic path when it's unset or unreachable: a dashboard **chat coach**
-(a LangGraph ReAct agent over the same functions the MCP server exposes) and **digest
-enrichment** (LangChain + a keyless web search that appends a personalized paragraph, study
-tips, and fresh practice problems). Nothing leaves your machine — the model runs in a
-local Ollama container.
-
----
+An **optional local LLM** (Ollama) enriches the weekly digest with a personalized paragraph,
+study tips, and web-searched practice problems. It only ever _appends_ to an already-complete
+email and falls back cleanly when unset or unreachable.
 
 ## Architecture
 
-```
-   ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐
-   │  Browser     │   │ React Dash   │   │  Claude Desktop  │
-   │  extension   │   │ (Vite · TS · │   │   (MCP client)   │
-   │ (popup rate) │   │  Tailwind)   │   └────────┬─────────┘
-   └──────┬───────┘   └──────┬───────┘            │
-          │ Bearer JWT       │ Bearer JWT         │ stdio
-          │                  │            ┌───────▼────────┐
-          │                  │            │   MCP server   │
-          │                  │            │ (proxies REST) │
-          │                  │            └───────┬────────┘
-          ▼                  ▼                    ▼
-   ┌───────────────────────────────────────────────────────┐
-   │                FastAPI backend  :8000                 │
-   │         attempts · similarity · stats · review        │
-   │  SM-2 scheduler · weak-topic + recommend (rule-based) │
-   │   Supabase-JWT auth · APScheduler weekly digest       │
-   └───────────┬───────────────────────────┬───────────────┘
-               │                           │
-        ┌──────▼──────┐            ┌───────▼────────┐
-        │ PostgreSQL  │            │ sentence-      │
-        │ + pgvector  │            │ transformers   │
-        │   :5432     │            │ (in-process)   │
-        └─────────────┘            └────────────────┘
-       ▲
-┌──────┴───────┐
-│   Supabase   │  issues JWTs the backend verifies via JWKS (ES256/RS256)
-│    (auth)    │  the extension gets its session from the web app via a bridge
-└──────────────┘
+```mermaid
+flowchart TB
+    subgraph clients["Clients"]
+        EXT["Browser extension<br/>(MV3 · popup rate)"]
+        WEB["React dashboard<br/>(Vite · TS · Tailwind)"]
+        MCPC["Claude Desktop / Code<br/>(MCP client)"]
+        STDIO["mcp_server.py<br/>(stdio, single-user)"]
+    end
+
+    SB[("Supabase auth<br/>issues JWTs · JWKS")]
+
+    subgraph api["FastAPI backend :8000"]
+        REST["REST routers<br/>attempts · review · similarity · stats"]
+        MCPH["Hosted MCP<br/>POST /mcp (Streamable HTTP)"]
+        AUTH["deps.py — verify JWT vs JWKS<br/>ES256/RS256 · upsert user"]
+        SVC["Service layer<br/>problems · similarity · stats · recommend<br/>SM-2 scheduler · weak topics · embeddings"]
+        JOB["APScheduler<br/>Sun 18:00 weekly digest"]
+    end
+
+    ST["sentence-transformers<br/>all-MiniLM-L6-v2 (in-process, cached)"]
+    PG[("PostgreSQL 16 + pgvector<br/>users · problems · attempts · digest_sends")]
+    OLL["Ollama (optional)<br/>digest enrichment"]
+    DDG["ddgs web search<br/>(keyless)"]
+    SMTP["SMTP → weekly email"]
+
+    EXT -- "session via bridge<br/>content script" --> WEB
+    WEB -- "OAuth" --> SB
+    STDIO -- "own refresh token<br/>(mcp_login.py)" --> SB
+
+    EXT -- "Bearer JWT" --> REST
+    WEB -- "Bearer JWT" --> REST
+    STDIO -- "Bearer JWT · HTTP" --> REST
+    MCPC -- "Bearer JWT" --> MCPH
+
+    REST --> AUTH
+    MCPH --> AUTH
+    AUTH -. "fetch public keys" .-> SB
+    AUTH --> SVC
+    JOB --> SVC
+
+    SVC --> ST
+    SVC --> PG
+    JOB -- "at-most-once claim<br/>(digest_sends)" --> PG
+    JOB --> SMTP
+    JOB -. "optional" .-> OLL
+    OLL -. "curates real URLs from" .-> DDG
 ```
 
----
+Data model, plus sequence diagrams for the rate-an-attempt, weekly-digest, and
+recommend-next flows: [docs/architecture.md](docs/architecture.md).
 
 ## Features
 
-| Feature | How it works |
-|---|---|
-| **Self-rating** | Every attempt logs a 1–5 difficulty score, a `solved_self` flag, tags, and notes. Repeat attempts on the same problem are kept as history, not overwritten. |
-| **Similarity search** | A problem's comma-separated tags are embedded with `all-MiniLM-L6-v2` and stored in pgvector. "Find similar" returns the closest matches from *your own* history. |
-| **Spaced repetition** | An SM-2 variant reschedules each problem from its attempt history — a fail or struggle resets the interval to 1 day, clean recalls stretch it out (1 → 6 → ×ease). No scheduler state is stored; the schedule is *derived* by folding SM-2 over the immutable attempt log. |
-| **Weak-topic detection** | Per tag, the recent (90-day) solved-unaided rate. A tag is "weak" below 50% *and* with ≥3 attempts, so one bad problem never brands a topic weak forever. |
-| **Recommend next** | Merges due-for-review and weak topics into one ranked suggestion — `high` priority means overdue **and** a weak topic — each carrying a plain-English `reason` string. |
-| **Weekly digest** | An APScheduler job emails a Sunday summary over SMTP: week stats with a week-over-week trend, the top-5 due-for-review problems, and a templated coach note built from simple conditionals. Also triggerable on demand from the dashboard. |
-| **Digest enrichment** *(optional LLM)* | When `OLLAMA_MODEL` is set, a best-effort layer appends a personalized paragraph, 4–5 study tips, and 4–5 web-searched practice problems. Search (keyless `ddgs`) is deterministic; the local LLM only writes and curates the real URLs. Any failure falls back to the plain digest — the email always sends. |
-| **Chat coach** *(optional LLM)* | A dashboard chat widget backed by a LangGraph ReAct agent. It calls the same functions as the MCP tools (weak problems, weak topics, recommendation) to ground every answer in your data — ask *"what should I grind this weekend?"*. Disabled (503) until `OLLAMA_MODEL` is set. |
-| **MCP tools** | Query the tracker from any MCP client — weak problems, overall stats, and the reasoned "recommend next problem". |
-
----
-
-## Tech Stack
-
-### Backend
-
-| Concern | Technology |
-|---|---|
-| Language | Python 3.11 |
-| Framework | FastAPI 0.115 + Uvicorn |
-| ORM | SQLAlchemy 2.0 · psycopg2 |
-| Database | PostgreSQL 16 + [pgvector](https://github.com/pgvector/pgvector) |
-| Auth | Supabase-issued JWT (ES256/RS256), verified against the project JWKS via PyJWT |
-| Embeddings | `sentence-transformers` — `all-MiniLM-L6-v2` (384-dim, local) |
-| Recall scheduling | SM-2 variant derived from the attempt log; weak-topic and recommend are plain deterministic Python |
-| Scheduler | APScheduler (weekly email digest) |
-| Optional LLM | [Ollama](https://ollama.com) (local, containerized) via `langchain-ollama`; chat coach on `langgraph` (`create_react_agent`); digest web search via keyless `ddgs` |
-| MCP | `mcp` 1.2 (`FastMCP`) — stdio server proxying the REST API |
-
-### Frontend
-
-| Concern | Technology |
-|---|---|
-| Framework | React 18 + TypeScript |
-| Build tool | Vite 5 |
-| Styling | Tailwind CSS + shadcn/ui (Radix primitives) |
-| Routing | React Router v6 |
-| Server state | TanStack Query |
-| Auth | `@supabase/supabase-js` (session + JWT interceptor) |
-| Motion / toasts | Framer Motion · Sonner |
-
-### Extension
-
-A manifest-v3 extension (Chrome / Edge / Firefox / Safari — it uses a shared
-`browser ?? chrome` handle). There is **no page scraping**: you click the toolbar icon on a
-problem page and a popup asks for your rating.
-
-It authenticates by reusing your dashboard session. A `bridge.js` content script on the web
-app copies the Supabase session into extension storage whenever it changes; `auth.js` just
-reads whatever was last synced and treats an expired or missing session as logged-out. The
-extension never bundles the Supabase SDK or calls Supabase itself — see
-[Key Design Decisions](#key-design-decisions) for why. If the session is stale, the popup
-shows a login prompt that opens the dashboard; logging in there syncs back automatically.
-
----
+| Feature                  | How it works                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Self-rating**          | Each attempt logs a 1–5 score, a `solved_self` flag, tags, and notes. Repeat attempts are kept as history, never overwritten.                                  |
+| **Similarity search**    | Tags are embedded with `all-MiniLM-L6-v2` into pgvector; "find similar" returns the closest matches from _your own_ history.                                   |
+| **Spaced repetition**    | An SM-2 variant folded over the immutable attempt log — a struggle resets the interval to 1 day, clean recalls stretch it (1 → 6 → ×ease). No scheduler state. |
+| **Weak-topic detection** | Per tag, the 90-day solved-unaided rate. Weak = below 50% _and_ ≥3 attempts, so one bad problem never brands a topic.                                          |
+| **Recommend next**       | Merges due reviews and weak topics into one ranked list; `high` priority means overdue **and** weak. Each carries a plain-English `reason`.                    |
+| **Weekly digest**        | An APScheduler job emails a Sunday summary over SMTP: week stats with trend, top-5 due problems, and a coach note. Also triggerable from the dashboard.        |
+| **Digest enrichment**    | _Optional._ With `OLLAMA_MODEL` set, a local LLM appends tips and web-searched problems (keyless `ddgs`). Any failure sends the plain digest.                  |
+| **MCP tools**            | Query the tracker from any MCP client: weak problems, overall stats, and the reasoned "recommend next".                                                        |
 
 ## Getting Started
 
-### Prerequisites
+**Prerequisites:** Docker Desktop · Node 18+ · a free [Supabase](https://supabase.com) project.
 
-- Docker Desktop
-- Node 18+ (for the dashboard)
-- A free [Supabase](https://supabase.com) project (for auth)
-
-### 1. Start the backend
+### 1. Backend
 
 ```bash
-# from the repo root
-cp .env.example .env
-# edit .env: Postgres user/password/db. No defaults — compose won't start without them.
+cp .env.example .env                  # Postgres user/password/db — no defaults, compose won't start without them
+cp backend/.env.example backend/.env  # set SUPABASE_PROJECT_URL (required); SMTP_* for the weekly email
 
-cp backend/.env.example backend/.env
-# edit backend/.env: set SUPABASE_PROJECT_URL (required), and SMTP_* if you want the weekly email
-
-docker compose up -d --build   # runs `alembic upgrade head`, then serves
+docker compose up -d --build          # runs `alembic upgrade head`, then serves
 ```
 
-Compose also starts a local **Ollama** service (for the optional chat coach and digest
-enrichment). To turn those on, pull a tool-capable model once and set `OLLAMA_MODEL`:
+Verify: `http://localhost:8000/health` → `{"status":"ok"}` · Docs: `/docs`
 
-```bash
-docker compose exec ollama ollama pull llama3.1   # ~4.7GB, one-time
-# then set OLLAMA_MODEL=llama3.1 in backend/.env and:
-docker compose up -d backend
-```
+Compose also starts an **Ollama** service for digest enrichment and sets `OLLAMA_MODEL=llama3.1`.
+Pull the model once — `docker compose exec ollama ollama pull llama3.1` (~4.7GB) — or set
+`OLLAMA_MODEL: ""` in `docker-compose.yml` to leave enrichment off. Everything else works either way.
 
-Leave `OLLAMA_MODEL` empty and the LLM features stay off — everything else works unchanged.
+The schema is owned by Alembic, not the app. The container migrates on boot; by hand:
+`docker compose exec backend alembic upgrade head`. Upgrading a deployment that predates
+migrations: `alembic stamp 0001` once, then `upgrade head`.
 
-The schema is owned by Alembic, not by the app. The container migrates on boot; to
-run one by hand: `docker compose exec backend alembic upgrade head`.
-
-**Upgrading a deployment that predates migrations** (its tables were made by the old
-`create_all`): adopt the baseline once, then migrate forward.
-
-```bash
-docker compose exec backend alembic stamp 0001
-docker compose exec backend alembic upgrade head
-```
-
-Verify: `http://localhost:8000/health` → `{"status":"ok"}`
-
-### 2. Run the dashboard
+### 2. Dashboard
 
 ```bash
 cd frontend
-cp .env.example .env   # set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-npm install
-npm run dev            # http://localhost:5173
+cp .env.example .env   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+npm install && npm run dev   # http://localhost:5173
 ```
 
-Log in, then add and edit problems, filter by difficulty / solved-self / platform / tag, find
-similar problems, work the **Review** tab, and trigger the weekly digest.
+### 3. Extension
 
-### 3. Load the extension
+Go to `chrome://extensions` → **Developer mode** → **Load unpacked** → select `extension/`.
+Log in on the dashboard and the extension picks up that session automatically via its bridge
+content script. Then click the toolbar icon on any problem page to rate it.
 
-1. Go to `chrome://extensions` → enable **Developer mode**.
-2. **Load unpacked** → select the `extension/` folder.
-3. Log in on the dashboard (step 2) — the extension picks that session up automatically via
-   the bridge content script.
-4. On a supported problem page, click the AlgoLog toolbar icon and rate the problem.
-
-### 4. (Optional) MCP server
-
-See [MCP Server](#mcp-server) below.
-
----
+It's manifest-v3 and cross-browser (Chrome / Edge / Firefox / Safari). It never bundles the
+Supabase SDK or calls Supabase itself — see [Design Decisions](#design-decisions).
 
 ## API Reference
 
 All endpoints require `Authorization: Bearer <supabase-jwt>`. Base URL `http://localhost:8000`.
 
-### Attempts & problems — `/api`
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/attempts` | Log an attempt (upserts the problem by user + URL, appends a new attempt row) |
-| GET | `/problems` | List your problems and attempts; filter by `min_rating`, `solved_self`, `platform`, `tag` |
-| PATCH | `/problems/{id}` | Update a problem; `rating` / `solved_self` update (or create) the latest attempt |
-| DELETE | `/problems/{id}` | Delete a problem (attempts cascade) |
-| GET | `/problems/{id}/similar` | Embedding-similar problems from your history |
-
-### Spaced repetition — `/api/review`
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/review?due_only=true` | SM-2 review queue, soonest-due first; `due_only=false` returns the whole schedule |
-
-### Stats — `/api/stats`
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/overview` | Totals: problems, attempts, solved-unaided, hard-rated (≥ 4) |
-| GET | `/weekly` | Last-7-days breakdown by platform and tag |
-| GET | `/weak-topics` | Tags whose recent solved-unaided rate is below threshold, with enough samples |
-| GET | `/recommend?count=1` | Ranked "what to do next" — due reviews + weak topics, each with a `reason` and `priority` |
-| POST | `/digest/send-now` | Send your weekly email digest immediately |
-
-### Chat coach — `/api/chat` *(optional LLM)*
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/chat` | Chat with the coach agent. Body `{ "message": str, "history": [{role, content}] }` → `{ "reply": str }`. Runs a LangGraph ReAct loop over the local Ollama model. Returns **503** when `OLLAMA_MODEL` is unset. |
-
-Health check: `GET /health` · Interactive docs: `http://localhost:8000/docs`
-
----
+| Method | Path                          | Description                                                                             |
+| ------ | ----------------------------- | --------------------------------------------------------------------------------------- |
+| POST   | `/api/attempts`               | Log an attempt (upserts the problem by user + URL, appends an attempt row)              |
+| GET    | `/api/problems`               | List problems and attempts; filter by `min_rating`, `solved_self`, `platform`, `tag`    |
+| PATCH  | `/api/problems/{id}`          | Update a problem; `rating` / `solved_self` update (or create) the latest attempt        |
+| DELETE | `/api/problems/{id}`          | Delete a problem (attempts cascade)                                                     |
+| GET    | `/api/problems/{id}/similar`  | Embedding-similar problems from your history                                            |
+| GET    | `/api/review?due_only=true`   | SM-2 review queue, soonest-due first; `due_only=false` returns the whole schedule       |
+| GET    | `/api/stats/overview`         | Totals: problems, attempts, solved-unaided, hard-rated (≥4)                             |
+| GET    | `/api/stats/weekly`           | Last-7-days breakdown by platform and tag                                               |
+| GET    | `/api/stats/weak-topics`      | Tags whose recent solved-unaided rate is below threshold, with enough samples           |
+| GET    | `/api/stats/recommend?count=1`| Ranked "what to do next" — due reviews + weak topics, each with `reason` and `priority` |
+| POST   | `/api/stats/digest/send-now`  | Send your weekly digest immediately                                                     |
 
 ## MCP Server
 
-A `FastMCP` stdio server exposing three tools to any MCP client:
+Three tools — `get_weak_problems`, `get_stats_overview`, and `get_recommended_problem` (the
+reasoned "what next", ranked with `reason` and `priority`) — served two ways:
 
-| Tool | What it does |
-|---|---|
-| `get_weak_problems` | Problems you rated hard (≥ threshold) or couldn't solve unaided |
-| `get_stats_overview` | Overall practice stats |
-| `get_recommended_problem` | Reasoned "what to work on next" — SM-2 due dates plus weak topics, ranked with `reason` and `priority` |
+**Hosted (recommended).** `POST /mcp`, Streamable HTTP, mounted into the FastAPI app. The MCP
+client owns the OAuth session and sends the user's JWT per request, so one process serves every
+user and stores no token. Add the URL as a custom connector in Claude and sign in through
+Supabase. In a real deployment, set `MCP_PUBLIC_URL` to the address clients actually reach —
+Claude checks the token was issued for that exact URL.
 
-The server acts as **you**: it holds its own Supabase refresh token and mints short-lived
-access tokens from it. It logs in *independently* rather than copying the dashboard's
-session, because Supabase rotates a refresh token on every redemption and invalidates the
-previous one — two clients sharing one token would keep silently logging each other out.
+**stdio (`app.mcp_server`).** One process per user, on your machine. It holds its own Supabase
+refresh token rather than copying the dashboard's, because Supabase rotates and invalidates a
+refresh token on every redemption — two clients sharing one would silently log each other out.
 
-**One-time setup:**
+<details>
+<summary>stdio setup</summary>
 
-1. In your Supabase dashboard, under **Authentication → URL Configuration → Redirect URLs**,
-   add `http://localhost:8765/` (the login script listens there briefly to catch the redirect).
-2. From `backend/`, run:
-   ```bash
-   python -m app.mcp_login
-   ```
-   This opens a browser to sign in via GitHub and saves the resulting refresh token to
-   `~/.algolog/mcp_refresh_token`. The server persists each rotated token back to that file,
-   so it survives restarts without re-seeding.
-
-Then add it to Claude Desktop's config (`%APPDATA%\Claude\claude_desktop_config.json` on
-Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+1. In Supabase → **Authentication → URL Configuration → Redirect URLs**, add
+   `http://localhost:8765/` (the login script listens there to catch the redirect).
+2. From `backend/`, run `python -m app.mcp_login`. It opens a browser to sign in and saves the
+   refresh token to `~/.algolog/mcp_refresh_token`, persisting each rotation back to that file.
+3. Add to `claude_desktop_config.json`:
 
 ```json
 {
@@ -321,150 +205,76 @@ Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` on ma
 }
 ```
 
-Restart Claude Desktop and ask: *"Using algolog, what should I revisit next?"* The
-recommender answers with something like *"Due for review (last solved 12 days ago, interval
-14d) AND tagged 'dp', where you solve only 35% unaided."*
+</details>
 
----
+Then ask: _"Using algolog, what should I revisit next?"_ → _"Due for review (last solved 12
+days ago, interval 14d) AND tagged 'dp', where you solve only 35% unaided."_
 
 ## Environment Variables
 
-Backend — `backend/.env`:
+Backend — `backend/.env` (see `backend/.env.example` for the annotated list):
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `postgresql+psycopg2://dsa:dsa@localhost:5432/algolog` | Postgres + pgvector connection (docker-compose overrides the host to `postgres`) |
-| `SUPABASE_PROJECT_URL` | **required** | Your Supabase project URL; its `/auth/v1/.well-known/jwks.json` endpoint verifies tokens. No default: the backend refuses to boot without it, rather than verifying your users' tokens against someone else's project. |
-| `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS origin for the dashboard |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model |
-| `EMBEDDING_DIM` | `384` | Embedding dimension (must match the model; changing it needs a migration to rewrite the column) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Gmail host/port, empty creds | Weekly digest, sent to each user's own address; use a Gmail App Password. Empty credentials disable email. Gmail caps ~500 recipients/day — past a few hundred users, point this at a transactional sender. |
-| `OLLAMA_MODEL` | empty (disabled) | Local Ollama model for the chat coach and digest enrichment. Must be **tool-capable** for chat (e.g. `llama3.1`). Empty leaves both features off and the core deterministic. Pull it first: `docker compose exec ollama ollama pull llama3.1`. |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint. docker-compose overrides this to `http://ollama:11434` (the service name); only set it by hand when running the backend outside compose. |
+| Variable                 | Default                        | Description                                                                                    |
+| ------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `SUPABASE_PROJECT_URL`   | **required**                   | Supabase project whose JWKS verifies tokens. No default — the backend refuses to boot without it |
+| `DATABASE_URL`           | local Postgres                 | Postgres + pgvector connection (compose overrides the host to `postgres`)                       |
+| `FRONTEND_ORIGIN`        | `http://localhost:5173`        | CORS origin for the dashboard                                                                   |
+| `MCP_PUBLIC_URL`         | `http://localhost:8000`        | Public URL the hosted MCP server advertises as its resource identifier                          |
+| `EMBEDDING_MODEL` / `_DIM` | `all-MiniLM-L6-v2` / `384`   | Must match each other; changing the dim needs a migration to rewrite the column                 |
+| `SMTP_HOST/PORT/USER/PASSWORD` | Gmail host/port, empty creds | Weekly digest. Use a Gmail App Password; empty creds disable email. Gmail caps ~500/day     |
+| `OLLAMA_MODEL`           | empty (disabled)               | Local model for digest enrichment. Compose sets `llama3.1`; empty leaves enrichment off         |
+| `OLLAMA_BASE_URL`        | `http://localhost:11434`       | Compose overrides this to `http://ollama:11434`; set by hand only outside compose               |
 
-Compose — `.env` at the repo root (read by `docker-compose.yml`, **not** by the app):
-`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`. No defaults, so an unset secret
-fails loudly instead of silently booting on a well-known password.
+Root `.env` (read by compose, **not** the app): `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+`POSTGRES_DB` — no defaults, so an unset secret fails loudly.
 
-Frontend — `frontend/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and optional
-`VITE_BACKEND_URL`.
-
-The extension's backend and dashboard URLs live in `extension/config.js`. It never talks to
-Supabase directly, so it needs no Supabase URL or key.
-
----
+Frontend — `frontend/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
+`VITE_BACKEND_URL`. The extension's URLs live in `extension/config.js`.
 
 ## Testing
 
-The backend has a pyramid-shaped `pytest` suite in `backend/tests/`:
-
-| Layer | What it covers | Needs a DB? |
-|---|---|---|
-| **Unit** | Embeddings wrapper, SM-2 scheduler, recommend ranking, weak-topic and digest logic, JWT verification, Pydantic schemas, SMTP — mocked or pure functions | No |
-| **Integration** | Every router (attempts, similarity, stats, review) via FastAPI `TestClient` against real Postgres + pgvector, each test rolled back | Yes |
-| **E2E** | One full journey: log → filter → stats → similar → digest → edit → delete | Yes |
-
-Embeddings are stubbed and there is no LLM to mock, so tests are fast and offline.
-Integration and E2E tests auto-skip when no test DB is reachable, so unit tests run anywhere:
+A pyramid-shaped `pytest` suite in `backend/tests/`: **unit** (scheduler, recommend, weak
+topics, digest, JWT, schemas — mocked or pure), **integration** (every router and the MCP
+server via `TestClient` against real Postgres + pgvector, each test rolled back), and one
+**E2E** journey. Embeddings are stubbed and there's no LLM to mock, so it's fast and offline.
 
 ```bash
 cd backend
 pip install -r requirements-dev.txt
+pytest tests/unit          # no DB needed — integration/E2E auto-skip without one
 
-# unit only (no DB needed)
-pytest tests/unit
-
-# full pyramid — point at a Postgres + pgvector instance
 docker run -d --name algolog-testdb -e POSTGRES_USER=dsa -e POSTGRES_PASSWORD=dsa \
   -e POSTGRES_DB=algolog_test -p 5432:5432 pgvector/pgvector:pg16
-TEST_DATABASE_URL=postgresql+psycopg2://dsa:dsa@localhost:5432/algolog_test \
-  pytest --cov=app
+TEST_DATABASE_URL=postgresql+psycopg2://dsa:dsa@localhost:5432/algolog_test pytest --cov=app
 ```
 
-CI (`.github/workflows/backend-tests.yml`) spins up a `pgvector/pgvector` service and runs
-the whole suite with coverage on every push and PR.
+CI runs the whole suite with coverage on every push and PR.
 
----
+## Design Decisions
 
-## Project Structure
-
-```
-.
-├── docker-compose.yml          # Postgres (pgvector) + backend
-│
-├── backend/                    # FastAPI + pgvector + MCP  (port 8000)
-│   └── app/
-│       ├── main.py             # App wiring, CORS, pgvector index, APScheduler digest job
-│       ├── config.py           # Settings (env-driven)
-│       ├── deps.py             # Supabase JWT verification (JWKS)
-│       ├── database.py         # Engine / session / Base
-│       ├── models.py           # SQLAlchemy models (per-user)
-│       ├── schemas.py          # Pydantic DTOs
-│       ├── mcp_server.py       # FastMCP stdio server
-│       ├── mcp_login.py        # One-time OAuth login to seed the MCP refresh token
-│       ├── routers/            # attempts · similarity · stats_router · review · chat
-│       └── services/           # embeddings · scheduler (SM-2) · recommend · digest
-│                               #   · digest_enrich (Ollama+web search) · agent (LangGraph)
-│
-├── extension/                  # MV3 browser extension (popup rating + session bridge)
-│   ├── manifest.json
-│   ├── config.js               # Backend / dashboard URLs + cross-browser `api` handle
-│   ├── auth.js                 # Reads the bridged session
-│   ├── background.js           # Service worker; opens onboarding on install
-│   ├── popup.{html,js}         # The rating UI
-│   ├── onboarding.{html,js}    # First-run tab
-│   └── content_scripts/
-│       └── bridge.js           # Copies the web-app Supabase session into the extension
-│
-└── frontend/                   # React + Vite + TS dashboard  (port 5173)
-    └── src/
-        ├── pages/              # Landing · Login · Dashboard · Review
-        ├── components/         # Cards, dialogs, filters, charts, ChatWidget, ui/ (shadcn)
-        └── lib/                # api.ts (JWT interceptor) · supabase.ts · types
-```
-
----
-
-## Key Design Decisions
-
-**A deterministic core, with the LLM as an optional topping.** The review scheduler,
-weak-topic detection, and the digest's recommendation are plain rules. Every suggestion is
-reproducible and debuggable — you can always answer *"why is this due?"* or *"why is dp
-flagged weak?"* — which is the right trade for a feature you rely on to guide practice. The
-optional LLM never replaces that logic: the chat coach only *reads* it through the same
-functions the MCP tools expose, and digest enrichment only *appends* to an already-complete
-email, falling back to the templated note on any failure. With `OLLAMA_MODEL` unset the
-system is exactly the deterministic tracker it was — and even when set, the model is a local
-Ollama container, so there are still no cloud API keys and no data leaving the machine.
+**A deterministic core; the LLM is a topping.** The scheduler, weak-topic detection, and
+recommender are plain rules, so you can always answer _"why is this due?"_ The optional LLM
+only appends to an already-complete digest email — and it's a local Ollama container, so no
+cloud keys and no data leaving the machine either way.
 
 **The SM-2 schedule stores no state.** Interval, ease, and repetitions are derived by folding
-SM-2 over a problem's immutable attempt log, so a review is just another logged attempt and
-the schedule is a pure function of history. Weak-topic detection reads only a 90-day window,
-so "weak" reflects current skill rather than old history.
+SM-2 over a problem's attempt log, so a review is just another logged attempt and the schedule
+is a pure function of history. Weak topics read a 90-day window, reflecting current skill.
 
-**Tags are the embedding signal.** A problem's comma-separated tags are what get embedded,
-not full problem text — which is why the extension requires at least one tag. Tags are a
-compact, high-signal summary that keeps "find similar" cheap and consistent.
+**Tags are the embedding signal**, not full problem text — a compact, high-signal summary that
+keeps "find similar" cheap and consistent. That's why the extension requires at least one tag.
 
-**Supabase for auth, nothing else.** Supabase issues the JWTs; the backend only verifies them
-against the project JWKS and upserts a thin user row so the digest knows your email. No
-passwords stored, no session server to run. Crucially, the dashboard's `supabase-js` client
-is the *only* thing that ever refreshes a token — the extension just re-reads the bridged
-copy, and the MCP server logs in on its own lineage. Since Supabase rotates and invalidates
-refresh tokens on every use, two independent refreshers sharing a token would race and
-silently log each other out.
+**Supabase for auth, nothing else.** The dashboard's `supabase-js` client is the _only_ thing
+that refreshes a token: the extension re-reads a bridged copy, the hosted MCP server holds none,
+and the stdio server has its own lineage. Since Supabase invalidates a refresh token on use, two
+independent refreshers sharing one would race and log each other out.
 
-**pgvector over a separate vector DB.** Embeddings live in the same Postgres as everything
-else, so similarity search is one SQL query (cosine distance, IVFFlat index) and there is one
-database to back up.
+**pgvector over a separate vector DB.** Embeddings live in the same Postgres as everything else
+— similarity search is one SQL query (cosine distance, IVFFlat), and one database to back up.
 
-**MCP proxies the REST API.** The MCP server calls the same HTTP endpoints the dashboard
-does, keeping one source of truth for business logic. It could talk to the DB directly if
-latency ever mattered.
-
----
+**MCP calls the service layer, not our own REST API.** Same code, same tenancy filters, one less
+hop, no token to relay.
 
 ## Contributing
 
-Contributions are welcome. Open an issue first for anything large or design-changing so we
-can align before you build.
+Contributions are welcome. Open an issue first for anything large or design-changing.

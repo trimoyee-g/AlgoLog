@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.config import settings
 from app.database import SessionLocal
 from app.mcp_http import mcp as mcp_server
-from app.routers import attempts, chat, review, similarity, stats_router
+from app.routers import attempts, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
 
 scheduler = BackgroundScheduler()
@@ -55,7 +55,6 @@ app.add_middleware(
 )
 
 app.include_router(attempts.router)
-app.include_router(chat.router)
 app.include_router(review.router)
 app.include_router(similarity.router)
 app.include_router(stats_router.router)

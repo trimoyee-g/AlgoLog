@@ -4,6 +4,7 @@ import type {
   Problem,
   ProblemFilters,
   ProblemUpdate,
+  Recommendation,
   ReviewItem,
   SimilarProblem,
 } from "./types";
@@ -70,6 +71,10 @@ export function getReviewQueue(dueOnly = true) {
   return request<ReviewItem[]>(`/api/review?due_only=${dueOnly}`);
 }
 
+export function getRecommendation(count = 1) {
+  return request<Recommendation[]>(`/api/stats/recommend?count=${count}`);
+}
+
 export function addAttempt(payload: AttemptCreate) {
   return request<{ problem_id: number; attempt_id: number }>("/api/attempts", {
     method: "POST",
@@ -96,20 +101,12 @@ export function getSimilar(problemId: number, limit = 5) {
   );
 }
 
+export function getDigestPreview() {
+  return request<{ note?: string; body: string }>("/api/stats/digest/preview");
+}
+
 export function sendDigestNow() {
   return request<{ note?: string }>("/api/stats/digest/send-now", {
     method: "POST",
-  });
-}
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export function sendChat(message: string, history: ChatMessage[]) {
-  return request<{ reply: string }>("/api/chat", {
-    method: "POST",
-    body: JSON.stringify({ message, history }),
   });
 }

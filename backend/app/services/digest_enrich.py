@@ -35,12 +35,18 @@ class Enrichment(BaseModel):
     problems: list[ProblemSuggestion] = Field(description="4-5 suggested practice problems, chosen only from the provided search results")
 
 
-def topics_to_target(weak: list[dict], stats: dict) -> list[str]:
-    """The weakest tags to coach on; fall back to this week's most-practiced tags."""
+def topics_to_target(weak: list[dict], stats: dict, recent: dict[str, dict] | None = None) -> list[str]:
+    """The weakest tags to coach on; fall back to this week's most-practiced tags,
+    then to the lowest-rate tags in the longer window — a quiet week still has
+    history worth coaching on, and that's exactly the week the nudge matters.
+    """
     if weak:
         return [w["tag"] for w in weak[:2]]
     by_tag = stats.get("by_tag") or {}
-    return sorted(by_tag, key=by_tag.get, reverse=True)[:2]
+    if by_tag:
+        return sorted(by_tag, key=by_tag.get, reverse=True)[:2]
+    recent = recent or {}
+    return sorted(recent, key=lambda t: recent[t]["rate"])[:2]
 
 
 def _search_problems(topics: list[str]) -> list[dict]:
@@ -66,11 +72,11 @@ def _prompt(stats: dict, topics: list[str], candidates: list[dict]) -> str:
     )
 
 
-def enrich(stats: dict, weak: list[dict]) -> Enrichment | None:
+def enrich(stats: dict, weak: list[dict], recent: dict[str, dict] | None = None) -> Enrichment | None:
     """Return LLM enrichment, or None if disabled or anything fails. Never raises."""
     if not settings.OLLAMA_MODEL:
         return None
-    topics = topics_to_target(weak, stats)
+    topics = topics_to_target(weak, stats, recent)
     if not topics:
         return None
     try:
@@ -101,6 +107,7 @@ def demo() -> None:
     assert topics_to_target([{"tag": "dp"}, {"tag": "graph"}, {"tag": "math"}], {}) == ["dp", "graph"]
     assert topics_to_target([], {"by_tag": {"greedy": 5, "dp": 9}}) == ["dp", "greedy"]
     assert topics_to_target([], {"by_tag": {}}) == []
+    assert topics_to_target([], {"by_tag": {}}, {"dp": {"rate": 0.7}, "greedy": {"rate": 0.4}}) == ["greedy", "dp"]
 
     # Disabled (empty model) short-circuits to None without touching network/LLM.
     settings.OLLAMA_MODEL = ""

@@ -56,9 +56,18 @@ def weak_topics(db: Session, user_id: str, *, threshold: float = WEAK_THRESHOLD,
     return out
 
 
+def priority_of(overdue: bool, weak_hit: bool) -> str:
+    """The urgency rule, shared by the queue rows and the recommender so a row
+    can never disagree with the pick above it."""
+    if overdue and weak_hit:
+        return "high"
+    return "medium" if overdue or weak_hit else "low"
+
+
 def review_queue(db: Session, user_id: str, due_only: bool = True) -> list[dict]:
     """SM-2 schedule per problem, soonest-due first (moved here from the router
     so the digest can reuse it)."""
+    weak = {t["tag"] for t in weak_topics(db, user_id)}
     problems = (
         db.query(Problem).options(joinedload(Problem.attempts))
         .filter(Problem.user_id == user_id).all()
@@ -72,6 +81,7 @@ def review_queue(db: Session, user_id: str, due_only: bool = True) -> list[dict]
         if due_only and sched.due > now:
             continue
         out.append({
+            "priority": priority_of(sched.due <= now, any(t in weak for t in split_tags(p.tags))),
             "id": p.id,
             "url": p.url,
             "title": p.title,
@@ -129,12 +139,8 @@ def rank_candidates(items: list[dict], rates: dict[str, dict], now: datetime, co
         if worst:
             parts.append(f"tagged '{worst}' where you solve only {round(worst_rate * 100)}% unaided")
 
-        if overdue and weak_hit:
-            priority = "high"
-        elif overdue or weak_hit:
-            priority = "medium"
-        else:
-            priority = "low"
+        priority = priority_of(overdue, bool(weak_hit))
+        if priority == "low":
             strong_hit = [t for t in tags if t in strong]
             if strong_hit:
                 t = strong_hit[0]

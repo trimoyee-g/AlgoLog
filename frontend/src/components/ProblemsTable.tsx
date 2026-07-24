@@ -12,6 +12,11 @@ interface ProblemsTableProps {
   loading: boolean;
 }
 
+// Header and body rows are separate grids, so they only line up if they share a
+// template. The last track is fixed (3 × h-9 icon buttons + 2 × gap-1), not `auto`:
+// `auto` measures each grid's own content, and the header's action cell is empty.
+const ROW_GRID = "grid grid-cols-[2.2fr_1fr_0.8fr_0.9fr_0.7fr_7.25rem] gap-2 px-4";
+
 function ratingVariant(rating: number): "success" | "warning" | "destructive" {
   if (rating <= 2) return "success";
   if (rating === 3) return "warning";
@@ -32,7 +37,7 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="grid grid-cols-[2.2fr_1fr_0.8fr_0.9fr_0.7fr_auto] gap-2 border-b border-border px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
+      <div className={`${ROW_GRID} border-b border-border py-2.5 text-xs uppercase tracking-wide text-muted-foreground`}>
         <div>Problem</div>
         <div>Tags</div>
         <div>Rating</div>
@@ -60,7 +65,7 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
           return (
             <Fragment key={p.id}>
             <div
-              className="grid grid-cols-[2.2fr_1fr_0.8fr_0.9fr_0.7fr_auto] items-center gap-2 border-b border-border px-4 py-3 text-sm hover:bg-secondary/40"
+              className={`${ROW_GRID} items-center border-b border-border py-3 text-sm hover:bg-secondary/40`}
             >
               <div>
                 <a

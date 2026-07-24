@@ -16,6 +16,5 @@ mcp==1.28.1   # 1.2.1 has no streamable-http transport (stdio|sse only) and no T
 python-multipart==0.0.12
 pyjwt==2.10.1   # mcp>=1.28 requires >=2.10.1
 cryptography==43.0.1
-langchain-ollama==0.2.3   # optional weekly-digest enrichment + chat agent, via local Ollama
+langchain-ollama==0.2.3   # optional weekly-digest enrichment, via local Ollama
 ddgs==9.0.0               # keyless web search for the digest's problem suggestions
-langgraph==0.2.60         # ReAct chat agent (create_react_agent) over the service layer

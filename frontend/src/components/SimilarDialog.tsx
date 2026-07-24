@@ -25,7 +25,7 @@ export function SimilarDialog({ problem, onOpenChange }: SimilarDialogProps) {
 
   return (
     <Dialog open={!!problem} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Similar to "{problem?.title}"</DialogTitle>
           <DialogDescription>
@@ -54,9 +54,9 @@ export function SimilarDialog({ problem, onOpenChange }: SimilarDialogProps) {
                   href={r.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 truncate text-sm font-medium text-primary hover:underline"
+                  className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                 >
-                  {r.title}
+                  <span className="truncate">{r.title}</span>
                   <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
                 </a>
                 <div className="mt-0.5 text-xs text-muted-foreground">

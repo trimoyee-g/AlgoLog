@@ -1,4 +1,4 @@
-import { Filter, Mail } from "lucide-react";
+import { FileText, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,6 @@ interface FiltersBarProps {
   onChange: (draft: FilterDraft) => void;
   onApply: () => void;
   onDigest: () => void;
-  digestPending: boolean;
 }
 
 export function FiltersBar({
@@ -30,7 +29,6 @@ export function FiltersBar({
   onChange,
   onApply,
   onDigest,
-  digestPending,
 }: FiltersBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -96,9 +94,9 @@ export function FiltersBar({
 
       <div className="flex-1" />
 
-      <Button variant="outline" size="sm" onClick={onDigest} disabled={digestPending}>
-        <Mail className="h-3.5 w-3.5" />
-        {digestPending ? "Sending…" : "Send weekly digest"}
+      <Button variant="outline" size="sm" onClick={onDigest}>
+        <FileText className="h-3.5 w-3.5" />
+        View digest
       </Button>
     </div>
   );
