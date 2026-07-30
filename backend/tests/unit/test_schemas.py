@@ -19,7 +19,6 @@ def test_attempt_create_accepts_full_payload():
 
 def test_attempt_create_optional_fields_default_none():
     a = AttemptCreate(**_valid_attempt())
-    assert a.official_difficulty is None
     assert a.notes is None
 
 

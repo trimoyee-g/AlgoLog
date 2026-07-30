@@ -79,7 +79,6 @@ export function ProblemsTable({ problems, loading }: ProblemsTableProps) {
                 </a>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {PLATFORM_LABELS[p.platform]}
-                  {p.official_difficulty ? ` · ${p.official_difficulty}` : ""}
                 </div>
               </div>
               <div>

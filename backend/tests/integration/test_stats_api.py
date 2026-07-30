@@ -75,7 +75,7 @@ def test_digest_appends_llm_enrichment_to_the_email_when_it_is_available(client,
 
     sent = {}
     monkeypatch.setattr(digest, "send_email", lambda to, subj, body: sent.update(body=body))
-    monkeypatch.setattr(digest, "enrich", lambda stats, weak: Enrichment(
+    monkeypatch.setattr(digest, "enrich", lambda stats, weak, recent=None: Enrichment(
         paragraph="Strong week on dp.", tips=["memoize"], problems=[]))
 
     _seed(db_session, "https://1", Platform.leetcode, "dp", rating=5, solved=True)

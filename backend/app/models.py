@@ -50,7 +50,6 @@ class Problem(Base):
     url = Column(String, nullable=False, index=True)
     title = Column(String, nullable=False)
     platform = Column(Enum(Platform), nullable=False)
-    official_difficulty = Column(String, nullable=True)  # e.g. "Medium", "1800", "Div2-C"
     tags = Column(String, nullable=False)  # comma-separated; the sole embedding signal
     embedding = Column(Vector(settings.EMBEDDING_DIM), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

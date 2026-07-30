@@ -31,7 +31,6 @@ export interface Problem {
   url: string;
   title: string;
   platform: Platform;
-  official_difficulty: string | null;
   tags: string | null;
   created_at: string;
   attempts: Attempt[];
@@ -59,7 +58,6 @@ export interface AttemptCreate {
   url: string;
   title: string;
   platform: Platform;
-  official_difficulty?: string | null;
   tags?: string | null;
   rating: number;
   solved_self: boolean;

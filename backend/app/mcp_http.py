@@ -67,7 +67,7 @@ mcp = FastMCP(
     "algolog",
     token_verifier=SupabaseTokenVerifier(),
     auth=AuthSettings(
-        issuer_url=AnyHttpUrl(settings.SUPABASE_PROJECT_URL),   # who mints tokens
+        issuer_url=AnyHttpUrl(settings.SUPABASE_PROJECT_URL.rstrip("/") + "/auth/v1"),   # who mints tokens
         resource_server_url=AnyHttpUrl(settings.MCP_PUBLIC_URL),  # who we are, to the client
         required_scopes=[],
     ),

@@ -9,6 +9,7 @@ from app.database import SessionLocal
 from app.mcp_http import mcp as mcp_server
 from app.routers import attempts, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
+from app.services.embeddings import _get_model
 
 scheduler = BackgroundScheduler()
 
@@ -30,6 +31,11 @@ async def lifespan(app: FastAPI):
     # No DDL here. Schema is owned by Alembic (`alembic upgrade head`, which the
     # container runs before booting) — create_all() can only ever CREATE, never
     # ALTER, so it silently no-ops on a schema change once real users' data exists.
+
+    # Load the embedding model before uvicorn accepts traffic. lru_cache locks its
+    # bookkeeping but not the wrapped call, so concurrent first requests would each
+    # build their own copy; warming here means they only ever see a cache hit.
+    _get_model()
 
     # Every Sunday at 6pm, send the digest email. Every replica fires this; the
     # digest_sends claim table makes the send itself at-most-once per user/week.

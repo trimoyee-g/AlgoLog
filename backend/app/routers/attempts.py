@@ -1,6 +1,8 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -22,25 +24,22 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
     history rather than overwritten, so you can see if your rating changes
     the 2nd/3rd time you meet the same problem).
     """
-    problem = db.query(Problem).filter(
-        Problem.user_id == user_id, Problem.url == payload.url
-    ).first()
-    if not problem:
-        problem = Problem(
-            user_id=user_id,
-            url=payload.url,
-            title=payload.title,
-            platform=Platform(payload.platform),
-            official_difficulty=payload.official_difficulty,
-            tags=payload.tags,
-        )
-        problem.embedding = embed_text(payload.tags)
-        db.add(problem)
-        db.flush()
+    
+    stmt = pg_insert(Problem).values(
+        user_id=user_id,
+        url=payload.url,
+        title=payload.title,
+        platform=Platform(payload.platform),
+        tags=payload.tags,
+        embedding=embed_text(payload.tags),
+    ).on_conflict_do_update(
+        constraint="uq_problem_user_url", set_={"url": payload.url},
+    ).returning(Problem.id)
+    problem_id = db.execute(stmt).scalar_one()
 
     attempt = Attempt(
         user_id=user_id,
-        problem_id=problem.id,
+        problem_id=problem_id,
         rating=payload.rating,
         solved_self=payload.solved_self,
         notes=payload.notes,
@@ -48,7 +47,7 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
     db.add(attempt)
     db.commit()
     db.refresh(attempt)
-    return {"problem_id": problem.id, "attempt_id": attempt.id}
+    return {"problem_id": problem_id, "attempt_id": attempt.id}
 
 
 @router.patch("/problems/{problem_id}", response_model=ProblemOut)
@@ -65,11 +64,6 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
         raise HTTPException(404, "Problem not found")
 
     if payload.url is not None:
-        clash = db.query(Problem).filter(Problem.user_id == user_id,
-                                         Problem.url == payload.url,
-                                         Problem.id != problem_id).first()
-        if clash:
-            raise HTTPException(409, "Another problem already uses that URL")
         problem.url = payload.url
     if payload.title is not None:
         problem.title = payload.title
@@ -91,7 +85,11 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
         if payload.solved_self is not None:
             latest.solved_self = payload.solved_self
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:  # uq_problem_user_url
+        db.rollback()
+        raise HTTPException(409, "Another problem already uses that URL")
     db.refresh(problem)
     return problem
 

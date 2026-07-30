@@ -1,12 +1,5 @@
 """
-MCP server for AlgoLog.
-
-Run this and connect it to Claude Desktop / Claude Code, and you can ask
-things like "what DP problems did I fail this month" or "log that I just
-struggled with this Codeforces problem" directly in chat - Claude calls
-these tools against your own backend.
-
-This talks to the FastAPI backend over HTTP rather than the DB directly,
+MCP server for AlgoLog - talks to the FastAPI backend over HTTP rather than the DB directly,
 so it stays a thin client and the backend remains the single source of truth.
 
 First-time setup:
@@ -34,16 +27,6 @@ BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
-# The MCP server acts as YOU (whoever runs this instance). It authenticates with
-# its own Supabase refresh token -- established once via `python -m app.mcp_login`,
-# deliberately independent of whatever session your dashboard browser tab is using
-# (see mcp_login.py's docstring) -- and mints short-lived access tokens from it.
-# Supabase ROTATES the refresh token on each use, so we persist the latest one to
-# a local file; since this lineage was never shared with the browser, rotating it
-# here never invalidates the dashboard's session, or vice versa.
-# Falls back to the SUPABASE_REFRESH_TOKEN env var if the file doesn't exist yet,
-# for anyone who obtained an independent token some other way (e.g. CI, or a future
-# multi-user token-issuance flow) -- but the normal path is `mcp_login.py`.
 _TOKEN_FILE = Path.home() / ".algolog" / "mcp_refresh_token"
 
 mcp = FastMCP("algolog")

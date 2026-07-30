@@ -6,8 +6,8 @@ context manager, so the lifespan never runs. This is the one test that does.
 The lifespan no longer touches the schema at all — Alembic owns that now (see
 migrations/, and the container's `alembic upgrade head` before boot), because
 create_all() can only CREATE and never ALTER, which stops being survivable the
-moment other people's data is in the table. So all that's left to assert is the
-scheduler.
+moment other people's data is in the table. So what's left to assert is the
+scheduler and the embedding-model warm-up.
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +18,7 @@ import app.main as main
 pytestmark = pytest.mark.integration
 
 
-def test_startup_schedules_the_digest_serves_traffic_and_shuts_down_cleanly(engine):
+def test_startup_schedules_the_digest_serves_traffic_and_shuts_down_cleanly(engine, monkeypatch):
     """One test, one boot. The lifespan runs `mcp.session_manager.run()` on the manager
     built once at import (main.py), and that manager refuses a second .run() for the
     life of the process — so a second test entering the lifespan cannot pass, no matter
@@ -27,9 +27,14 @@ def test_startup_schedules_the_digest_serves_traffic_and_shuts_down_cleanly(engi
     if engine is None:
         pytest.skip("no Postgres+pgvector test DB (set TEST_DATABASE_URL)")
 
+    # Boot warms the embedding model; stub it so the suite doesn't pull 90MB of weights.
+    warmed = []
+    monkeypatch.setattr(main, "_get_model", lambda: warmed.append(True))
+
     with TestClient(main.app) as client:
         assert client.get("/health").json() == {"status": "ok"}
 
+        assert warmed  # model loaded at boot, not on the first user's request
         assert main.scheduler.running
         jobs = main.scheduler.get_jobs()
         assert len(jobs) == 1

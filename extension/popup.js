@@ -75,7 +75,6 @@ document.getElementById("save").addEventListener("click", async () => {
         url: tab.url.split("?")[0],
         title,
         platform: guessPlatform(tab.url),
-        official_difficulty: null,
         tags,
         rating,
         solved_self: solvedSelf,

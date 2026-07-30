@@ -143,17 +143,11 @@ def run_weekly_digest(db: Session) -> dict:
     """Scheduled job: send each user their own digest, at most once per ISO week
     no matter how many replicas fire the cron.
 
-    ponytail: the claim row is the only coordination — no Redis, no leader election.
-    If you outgrow the in-process scheduler (SMTP is serial and runs in the web
-    process), move the cron to an external trigger hitting a job endpoint; the
-    claim stays correct either way.
+    The claim row is the only coordination — no Redis, no leader election.
     """
     week = iso_week(datetime.utcnow())
     results, skipped, failed = [], 0, 0
 
-    # Snapshot the ids, don't iterate ORM instances: the loop commits (and, on
-    # failure, rolls back) underneath itself, which expires every live instance —
-    # a plain id can't go stale, and this drops a refresh query per user.
     user_ids = [uid for (uid,) in db.query(User.id).all()]
 
     for user_id in user_ids:

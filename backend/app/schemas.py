@@ -8,7 +8,6 @@ class AttemptCreate(BaseModel):
     url: str
     title: str
     platform: str  # leetcode | codeforces | codechef | atcoder | gfg
-    official_difficulty: Optional[str] = None
     tags: str  # required — the sole embedding signal
     rating: int  # 1-5
     solved_self: bool
@@ -40,7 +39,6 @@ class ProblemOut(BaseModel):
     url: str
     title: str
     platform: str
-    official_difficulty: Optional[str]
     tags: Optional[str]
     created_at: datetime
     attempts: List[AttemptOut] = []
