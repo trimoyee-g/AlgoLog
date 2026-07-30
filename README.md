@@ -16,6 +16,13 @@ schedule, and emails a weekly digest — no cloud API keys, no data leaving your
 [![MCP](https://img.shields.io/badge/MCP-server-purple?style=flat-square)](https://modelcontextprotocol.io)
 [![backend-tests](https://github.com/trimoyee-g/AlgoLog/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/trimoyee-g/AlgoLog/actions/workflows/backend-tests.yml)
 
+[Architecture](docs/architecture.md) ·
+[API Reference](docs/api-reference.md) ·
+[MCP Server](docs/mcp-server.md) ·
+[Environment Variables](docs/environment-variables.md) ·
+[Testing](docs/testing.md) ·
+[Design Decisions](docs/design-decisions.md)
+
 </div>
 
 ---
@@ -40,58 +47,7 @@ An **optional local LLM** (Ollama) enriches the weekly digest with a personalize
 study tips, and web-searched practice problems. It only ever _appends_ to an already-complete
 email and falls back cleanly when unset or unreachable.
 
-## Architecture
-
-```mermaid
-flowchart TB
-    subgraph clients["Clients"]
-        EXT["Browser extension<br/>(MV3 · popup rate)"]
-        WEB["React dashboard<br/>(Vite · TS · Tailwind)"]
-        MCPC["Claude Desktop / Code<br/>(MCP client)"]
-        STDIO["mcp_server.py<br/>(stdio, single-user)"]
-    end
-
-    SB[("Supabase auth<br/>issues JWTs · JWKS")]
-
-    subgraph api["FastAPI backend :8000"]
-        REST["REST routers<br/>attempts · review · similarity · stats"]
-        MCPH["Hosted MCP<br/>POST /mcp (Streamable HTTP)"]
-        AUTH["deps.py — verify JWT vs JWKS<br/>ES256/RS256 · upsert user"]
-        SVC["Service layer<br/>problems · similarity · stats · recommend<br/>SM-2 scheduler · weak topics · embeddings"]
-        JOB["APScheduler<br/>Sun 18:00 weekly digest"]
-    end
-
-    ST["sentence-transformers<br/>all-MiniLM-L6-v2 (in-process, cached)"]
-    PG[("PostgreSQL 16 + pgvector<br/>users · problems · attempts · digest_sends")]
-    OLL["Ollama (optional)<br/>digest enrichment"]
-    DDG["ddgs web search<br/>(keyless)"]
-    SMTP["SMTP → weekly email"]
-
-    EXT -- "session via bridge<br/>content script" --> WEB
-    WEB -- "OAuth" --> SB
-    STDIO -- "own refresh token<br/>(mcp_login.py)" --> SB
-
-    EXT -- "Bearer JWT" --> REST
-    WEB -- "Bearer JWT" --> REST
-    STDIO -- "Bearer JWT · HTTP" --> REST
-    MCPC -- "Bearer JWT" --> MCPH
-
-    REST --> AUTH
-    MCPH --> AUTH
-    AUTH -. "fetch public keys" .-> SB
-    AUTH --> SVC
-    JOB --> SVC
-
-    SVC --> ST
-    SVC --> PG
-    JOB -- "at-most-once claim<br/>(digest_sends)" --> PG
-    JOB --> SMTP
-    JOB -. "optional" .-> OLL
-    OLL -. "curates real URLs from" .-> DDG
-```
-
-Data model, plus sequence diagrams for the rate-an-attempt, weekly-digest, and
-recommend-next flows: [docs/architecture.md](docs/architecture.md).
+Full system diagram, data model, and sequence diagrams: [docs/architecture.md](docs/architecture.md).
 
 ## Features
 
@@ -144,136 +100,33 @@ Log in on the dashboard and the extension picks up that session automatically vi
 content script. Then click the toolbar icon on any problem page to rate it.
 
 It's manifest-v3 and cross-browser (Chrome / Edge / Firefox / Safari). It never bundles the
-Supabase SDK or calls Supabase itself — see [Design Decisions](#design-decisions).
+Supabase SDK or calls Supabase itself — see [Design Decisions](docs/design-decisions.md).
 
-## API Reference
+### 4. MCP server (optional)
 
-All endpoints require `Authorization: Bearer <supabase-jwt>`. Base URL `http://localhost:8000`.
+Ask Claude what to revisit next without opening the dashboard — hosted (recommended) or
+stdio setup, both covered in [docs/mcp-server.md](docs/mcp-server.md).
 
-| Method | Path                          | Description                                                                             |
-| ------ | ----------------------------- | --------------------------------------------------------------------------------------- |
-| POST   | `/api/attempts`               | Log an attempt (upserts the problem by user + URL, appends an attempt row)              |
-| GET    | `/api/problems`               | List problems and attempts; filter by `min_rating`, `solved_self`, `platform`, `tag`    |
-| PATCH  | `/api/problems/{id}`          | Update a problem; `rating` / `solved_self` update (or create) the latest attempt        |
-| DELETE | `/api/problems/{id}`          | Delete a problem (attempts cascade)                                                     |
-| GET    | `/api/problems/{id}/similar`  | Embedding-similar problems from your history                                            |
-| GET    | `/api/review?due_only=true`   | SM-2 review queue, soonest-due first; `due_only=false` returns the whole schedule       |
-| GET    | `/api/stats/overview`         | Totals: problems, attempts, solved-unaided, hard-rated (≥4)                             |
-| GET    | `/api/stats/weekly`           | Last-7-days breakdown by platform and tag                                               |
-| GET    | `/api/stats/weak-topics`      | Tags whose recent solved-unaided rate is below threshold, with enough samples           |
-| GET    | `/api/stats/recommend?count=1`| Ranked "what to do next" — due reviews + weak topics, each with `reason` and `priority` |
-| POST   | `/api/stats/digest/send-now`  | Send your weekly digest immediately                                                     |
+## Reference
 
-## MCP Server
-
-Three tools — `get_weak_problems`, `get_stats_overview`, and `get_recommended_problem` (the
-reasoned "what next", ranked with `reason` and `priority`) — served two ways:
-
-**Hosted (recommended).** `POST /mcp`, Streamable HTTP, mounted into the FastAPI app. The MCP
-client owns the OAuth session and sends the user's JWT per request, so one process serves every
-user and stores no token. Add the URL as a custom connector in Claude and sign in through
-Supabase. In a real deployment, set `MCP_PUBLIC_URL` to the address clients actually reach —
-Claude checks the token was issued for that exact URL.
-
-**stdio (`app.mcp_server`).** One process per user, on your machine. It holds its own Supabase
-refresh token rather than copying the dashboard's, because Supabase rotates and invalidates a
-refresh token on every redemption — two clients sharing one would silently log each other out.
-
-<details>
-<summary>stdio setup</summary>
-
-1. In Supabase → **Authentication → URL Configuration → Redirect URLs**, add
-   `http://localhost:8765/` (the login script listens there to catch the redirect).
-2. From `backend/`, run `python -m app.mcp_login`. It opens a browser to sign in and saves the
-   refresh token to `~/.algolog/mcp_refresh_token`, persisting each rotation back to that file.
-3. Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "algolog": {
-      "command": "python",
-      "args": ["-m", "app.mcp_server"],
-      "cwd": "/absolute/path/to/repo/backend",
-      "env": {
-        "BACKEND_URL": "http://localhost:8000",
-        "SUPABASE_URL": "https://<your-ref>.supabase.co",
-        "SUPABASE_ANON_KEY": "<your-anon-key>"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-Then ask: _"Using algolog, what should I revisit next?"_ → _"Due for review (last solved 12
-days ago, interval 14d) AND tagged 'dp', where you solve only 35% unaided."_
-
-## Environment Variables
-
-Backend — `backend/.env` (see `backend/.env.example` for the annotated list):
-
-| Variable                 | Default                        | Description                                                                                    |
-| ------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `SUPABASE_PROJECT_URL`   | **required**                   | Supabase project whose JWKS verifies tokens. No default — the backend refuses to boot without it |
-| `DATABASE_URL`           | local Postgres                 | Postgres + pgvector connection (compose overrides the host to `postgres`)                       |
-| `FRONTEND_ORIGIN`        | `http://localhost:5173`        | CORS origin for the dashboard                                                                   |
-| `MCP_PUBLIC_URL`         | `http://localhost:8000`        | Public URL the hosted MCP server advertises as its resource identifier                          |
-| `EMBEDDING_MODEL` / `_DIM` | `all-MiniLM-L6-v2` / `384`   | Must match each other; changing the dim needs a migration to rewrite the column                 |
-| `SMTP_HOST/PORT/USER/PASSWORD` | Gmail host/port, empty creds | Weekly digest. Use a Gmail App Password; empty creds disable email. Gmail caps ~500/day     |
-| `OLLAMA_MODEL`           | empty (disabled)               | Local model for digest enrichment. Compose sets `llama3.1`; empty leaves enrichment off         |
-| `OLLAMA_BASE_URL`        | `http://localhost:11434`       | Compose overrides this to `http://ollama:11434`; set by hand only outside compose               |
-
-Root `.env` (read by compose, **not** the app): `POSTGRES_USER`, `POSTGRES_PASSWORD`,
-`POSTGRES_DB` — no defaults, so an unset secret fails loudly.
-
-Frontend — `frontend/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
-`VITE_BACKEND_URL`. The extension's URLs live in `extension/config.js`.
+| Topic                    | Doc                                              |
+| ------------------------- | ------------------------------------------------- |
+| System diagram, data model, sequence flows | [docs/architecture.md](docs/architecture.md) |
+| REST endpoints             | [docs/api-reference.md](docs/api-reference.md)     |
+| MCP tools & setup           | [docs/mcp-server.md](docs/mcp-server.md)           |
+| Config & env vars          | [docs/environment-variables.md](docs/environment-variables.md) |
+| Test suite                 | [docs/testing.md](docs/testing.md)                 |
+| Why it's built this way    | [docs/design-decisions.md](docs/design-decisions.md) |
 
 ## Testing
-
-A pyramid-shaped `pytest` suite in `backend/tests/`: **unit** (scheduler, recommend, weak
-topics, digest, JWT, schemas — mocked or pure), **integration** (every router and the MCP
-server via `TestClient` against real Postgres + pgvector, each test rolled back), and one
-**E2E** journey. Embeddings are stubbed and there's no LLM to mock, so it's fast and offline.
 
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-pytest tests/unit          # no DB needed — integration/E2E auto-skip without one
-
-docker run -d --name algolog-testdb -e POSTGRES_USER=dsa -e POSTGRES_PASSWORD=dsa \
-  -e POSTGRES_DB=algolog_test -p 5432:5432 pgvector/pgvector:pg16
-TEST_DATABASE_URL=postgresql+psycopg2://dsa:dsa@localhost:5432/algolog_test pytest --cov=app
+pytest tests/unit
 ```
 
-CI runs the whole suite with coverage on every push and PR.
-
-## Design Decisions
-
-**A deterministic core; the LLM is a topping.** The scheduler, weak-topic detection, and
-recommender are plain rules, so you can always answer _"why is this due?"_ The optional LLM
-only appends to an already-complete digest email — and it's a local Ollama container, so no
-cloud keys and no data leaving the machine either way.
-
-**The SM-2 schedule stores no state.** Interval, ease, and repetitions are derived by folding
-SM-2 over a problem's attempt log, so a review is just another logged attempt and the schedule
-is a pure function of history. Weak topics read a 90-day window, reflecting current skill.
-
-**Tags are the embedding signal**, not full problem text — a compact, high-signal summary that
-keeps "find similar" cheap and consistent. That's why the extension requires at least one tag.
-
-**Supabase for auth, nothing else.** The dashboard's `supabase-js` client is the _only_ thing
-that refreshes a token: the extension re-reads a bridged copy, the hosted MCP server holds none,
-and the stdio server has its own lineage. Since Supabase invalidates a refresh token on use, two
-independent refreshers sharing one would race and log each other out.
-
-**pgvector over a separate vector DB.** Embeddings live in the same Postgres as everything else
-— similarity search is one SQL query (cosine distance, IVFFlat), and one database to back up.
-
-**MCP calls the service layer, not our own REST API.** Same code, same tenancy filters, one less
-hop, no token to relay.
+Full suite (unit, integration, E2E) and CI details: [docs/testing.md](docs/testing.md).
 
 ## Contributing
 
