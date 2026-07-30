@@ -27,6 +27,10 @@ schedule, and emails a weekly digest — no cloud API keys, no data leaving your
 
 ---
 
+## Demo
+
+![AlgoLog demo](assets/demo.gif)
+
 ## Overview
 
 Three ways in, one brain behind them:
