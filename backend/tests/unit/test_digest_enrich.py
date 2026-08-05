@@ -17,6 +17,7 @@ WEAK = [{"tag": "dp"}, {"tag": "graphs"}]
 @pytest.fixture(autouse=True)
 def _enabled(monkeypatch):
     monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.1")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")  # drive the local branch
 
 
 @pytest.fixture
@@ -216,5 +217,5 @@ def test_render_enrichment_omits_the_problems_section_when_there_are_none():
 def test_module_self_check_passes(_enabled):
     """`python -m app.services.digest_enrich` is the only check runnable in the image
     (which ships no pytest), so it has to keep working. _enabled's monkeypatch undoes
-    demo()'s write to settings.OLLAMA_MODEL."""
+    demo()'s writes to the settings it disables."""
     de.demo()

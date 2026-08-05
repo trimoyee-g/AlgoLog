@@ -1,4 +1,5 @@
 import type {
+  AskResult,
   AttemptCreate,
   Overview,
   Problem,
@@ -7,6 +8,7 @@ import type {
   Recommendation,
   ReviewItem,
   SimilarProblem,
+  StudyDocument,
 } from "./types";
 import { supabase } from "./supabase";
 
@@ -31,7 +33,11 @@ async function request<T>(
   const resp = await fetch(`${BASE_URL}${path}`, {
     ...rest,
     headers: {
-      ...(rest.body ? { "Content-Type": "application/json" } : {}),
+      // FormData sets its own multipart Content-Type with a boundary; forcing
+      // application/json here makes the upload unparseable server-side.
+      ...(rest.body && !(rest.body instanceof FormData)
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
@@ -108,5 +114,26 @@ export function getDigestPreview() {
 export function sendDigestNow() {
   return request<{ note?: string }>("/api/stats/digest/send-now", {
     method: "POST",
+  });
+}
+
+export function listDocuments() {
+  return request<StudyDocument[]>("/api/documents");
+}
+
+export function uploadDocument(file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  return request<StudyDocument>("/api/documents", { method: "POST", body });
+}
+
+export function deleteDocument(id: number) {
+  return request<void>(`/api/documents/${id}`, { method: "DELETE" });
+}
+
+export function askDocuments(question: string) {
+  return request<AskResult>("/api/documents/ask", {
+    method: "POST",
+    body: JSON.stringify({ question }),
   });
 }

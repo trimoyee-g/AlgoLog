@@ -47,6 +47,21 @@ class ProblemOut(BaseModel):
         from_attributes = True
 
 
+class DocumentOut(BaseModel):
+    id: int
+    filename: str
+    pages: int
+    chunks: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
 class SimilarProblemOut(BaseModel):
     id: int
     url: str

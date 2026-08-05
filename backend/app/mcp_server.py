@@ -88,6 +88,12 @@ async def _get(path: str, **params) -> str:
         return (await client.get(f"{BACKEND_URL}{path}", params=clean)).text
 
 
+async def _post(path: str, timeout: float = 30.0, **body) -> str:
+    token = await _access()
+    async with httpx.AsyncClient(timeout=timeout, headers={"Authorization": f"Bearer {token}"}) as client:
+        return (await client.post(f"{BACKEND_URL}{path}", json=body)).text
+
+
 @mcp.tool()
 async def get_weak_problems(
     min_rating: Annotated[int, Field(description="Minimum self-rated difficulty, 1-5")] = 4,
@@ -119,6 +125,22 @@ async def get_recommended_problem(
     (high = overdue AND a weak topic). Use this to coach the user unprompted, e.g. 'you're due
     to revisit X, and you tend to struggle with dp'."""
     return await _get("/api/stats/recommend", count=count)
+
+
+@mcp.tool()
+async def search_study_material(
+    question: Annotated[str, Field(description="What to look up in the user's uploaded study notes")],
+) -> str:
+    """Search the user's own uploaded study material (PDFs they saved, e.g. a DP chapter).
+
+    Runs a corrective-RAG loop server-side: vector search, cross-encoder grading, and a
+    query rewrite if the first pass came back thin. Returns `passages` (graded extracts,
+    each with a `relevance` score and its source document), plus `trace` showing what the
+    loop did. Use the passages to answer the user — prefer them over general knowledge,
+    and say so when they don't cover the question. `answer` is populated only when the
+    user runs a local LLM; ignore it when null and write the answer yourself."""
+    # The graph can rewrite-and-retry, so it needs longer than a plain GET.
+    return await _post("/api/documents/ask", timeout=120.0, question=question)
 
 
 if __name__ == "__main__":

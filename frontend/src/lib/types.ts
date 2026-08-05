@@ -80,6 +80,44 @@ export interface ProblemFilters {
   tag?: string;
 }
 
+/** Study material: uploaded PDFs, chunked and embedded for the CRAG search. */
+export interface StudyDocument {
+  id: number;
+  filename: string;
+  pages: number;
+  chunks: number;
+  created_at: string;
+}
+
+/**
+ * One graded extract. `relevance` is a raw cross-encoder logit (roughly -11..+7),
+ * meaningful only as an ordering — never render it as a score.
+ */
+export interface Passage {
+  chunk_id: number;
+  document_id: number;
+  document: string;
+  ordinal: number;
+  text: string;
+  similarity: number;
+  relevance: number;
+}
+
+export interface WebResult {
+  title: string;
+  url: string;
+  text: string;
+}
+
+export interface AskResult {
+  question: string;
+  /** Null unless the backend has a local LLM configured — passages still come back. */
+  answer: string | null;
+  passages: Passage[];
+  web: WebResult[];
+  trace: string[];
+}
+
 /** `/api/stats/recommend` — the ranked pick, with the reason the backend already builds. */
 export type Priority = "high" | "medium" | "low";
 

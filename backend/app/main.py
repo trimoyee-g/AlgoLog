@@ -7,9 +7,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.config import settings
 from app.database import SessionLocal
 from app.mcp_http import mcp as mcp_server
-from app.routers import attempts, review, similarity, stats_router
+from app.routers import attempts, documents, review, similarity, stats_router
 from app.services.digest import run_weekly_digest
-from app.services.embeddings import _get_model
+from app.services.embeddings import _get_model, _get_reranker
 
 scheduler = BackgroundScheduler()
 
@@ -35,7 +35,9 @@ async def lifespan(app: FastAPI):
     # Load the embedding model before uvicorn accepts traffic. lru_cache locks its
     # bookkeeping but not the wrapped call, so concurrent first requests would each
     # build their own copy; warming here means they only ever see a cache hit.
+    # Same for the CRAG reranker — a cold CrossEncoder load stalls the first query.
     _get_model()
+    _get_reranker()
 
     # Every Sunday at 6pm, send the digest email. Every replica fires this; the
     # digest_sends claim table makes the send itself at-most-once per user/week.
@@ -61,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(attempts.router)
+app.include_router(documents.router)
 app.include_router(review.router)
 app.include_router(similarity.router)
 app.include_router(stats_router.router)

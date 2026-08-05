@@ -16,5 +16,9 @@ mcp==1.28.1   # 1.2.1 has no streamable-http transport (stdio|sse only) and no T
 python-multipart==0.0.12
 pyjwt==2.10.1   # mcp>=1.28 requires >=2.10.1
 cryptography==43.0.1
-langchain-ollama==0.2.3   # optional weekly-digest enrichment, via local Ollama
+langchain-google-genai==2.1.12   # hosted chat model (Gemini); last 2.x, the langchain-core 0.3 line
+langchain-ollama==0.2.3   # local chat-model fallback when no GEMINI_API_KEY
 ddgs==9.0.0               # keyless web search for the digest's problem suggestions
+pypdf==5.1.0                        # study-material upload: PDF -> text
+langchain-text-splitters==0.3.2     # chunking; needs only langchain-core, already pulled above
+langgraph==0.2.53                   # CRAG retrieval loop (app/services/crag.py)

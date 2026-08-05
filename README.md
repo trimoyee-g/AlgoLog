@@ -7,7 +7,8 @@
 Log every LeetCode / Codeforces / CodeChef / AtCoder / GFG problem you attempt with a 1–5
 difficulty score and an honest "did I actually solve this myself?" flag. AlgoLog finds
 problems similar to ones you struggled with, resurfaces weak ones on a spaced-repetition
-schedule, and emails a weekly digest — no cloud API keys, no data leaving your machine.
+schedule, answers questions from your own uploaded notes, and emails a weekly digest — self-hosted,
+and your practice history never leaves your machine.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -38,18 +39,27 @@ Three ways in, one brain behind them:
 - **Browser extension** — click the toolbar icon on a problem page and rate the submission
   you just made. The platform is inferred from the tab URL.
 - **React dashboard** — add, edit, and filter problems, find similar ones, work the review
-  queue, and see what to revisit next with the reason it was picked.
+  queue, upload study PDFs to ask questions against, and see what to revisit next with the
+  reason it was picked.
 - **MCP server** — ask Claude _"what should I revisit next?"_ and let it call your tracker
-  as tools.
+  as tools, including search over your own study notes.
 
-Everything that guides your practice is deterministic: embeddings run in-process via
+Everything that _guides_ your practice is deterministic: embeddings run in-process via
 `sentence-transformers`, and the SM-2 scheduler, weak-topic detection, and recommender are
 plain rules — so every suggestion is reproducible. Auth is delegated to Supabase (JWT); the
 backend verifies tokens against the project JWKS and never stores a password.
 
-An **optional local LLM** (Ollama) enriches the weekly digest with a personalized paragraph,
-study tips, and web-searched practice problems. It only ever _appends_ to an already-complete
-email and falls back cleanly when unset or unreachable.
+An **optional chat model** does the two jobs that need generation, and nothing else. It appends
+tips and practice problems to an already-complete weekly digest, and it rewrites queries and
+writes answers in the study-material RAG loop — where passage grading stays with a cross-encoder,
+not the LLM. Set `GEMINI_API_KEY` (free tier, seconds per answer) or `OLLAMA_MODEL` for a fully
+local one; Gemini wins when both are set. With neither, or when the model is unreachable, both
+features degrade rather than fail: the digest sends its deterministic content, and asking returns
+graded passages with no answer.
+
+Two features reach the public internet on their own, both keyless via `ddgs`: the digest's problem
+suggestions, and the RAG loop's web fallback when your own notes turn up nothing. Beyond those and
+the chat model you choose, everything stays local.
 
 Full system diagram, data model, and sequence diagrams: [docs/architecture.md](docs/architecture.md).
 
@@ -63,8 +73,10 @@ Full system diagram, data model, and sequence diagrams: [docs/architecture.md](d
 | **Weak-topic detection** | Per tag, the 90-day solved-unaided rate. Weak = below 50% _and_ ≥3 attempts, so one bad problem never brands a topic.                                          |
 | **Recommend next**       | Merges due reviews and weak topics into one ranked list; `high` priority means overdue **and** weak. Each carries a plain-English `reason`.                    |
 | **Weekly digest**        | An APScheduler job emails a Sunday summary over SMTP: week stats with trend, top-5 due problems, and a coach note. Also triggerable from the dashboard.        |
-| **Digest enrichment**    | _Optional._ With `OLLAMA_MODEL` set, a local LLM appends tips and web-searched problems (keyless `ddgs`). Any failure sends the plain digest.                  |
-| **MCP tools**            | Query the tracker from any MCP client: weak problems, overall stats, and the reasoned "recommend next".                                                        |
+| **Digest enrichment**    | _Optional._ With a chat model configured, it appends tips and web-searched problems (keyless `ddgs`). Any failure sends the plain digest.                       |
+| **Study material**       | Upload a PDF (≤`MAX_UPLOAD_MB`, default 20); text is extracted, chunked, and embedded into pgvector. The file itself is never stored, only its text.           |
+| **Ask your notes**       | A corrective-RAG loop: vector search → cross-encoder grading → query rewrite if thin → web fallback if empty → grounded answer. Retrieval works with no LLM.    |
+| **MCP tools**            | Query the tracker from any MCP client: weak problems, overall stats, the reasoned "recommend next", and search over your uploaded study material.               |
 
 ## Getting Started
 
@@ -81,9 +93,11 @@ docker compose up -d --build          # runs `alembic upgrade head`, then serves
 
 Verify: `http://localhost:8000/health` → `{"status":"ok"}` · Docs: `/docs`
 
-Compose also starts an **Ollama** service for digest enrichment and sets `OLLAMA_MODEL=llama3.1`.
-Pull the model once — `docker compose exec ollama ollama pull llama3.1` (~4.7GB) — or set
-`OLLAMA_MODEL: ""` in `docker-compose.yml` to leave enrichment off. Everything else works either way.
+The generation features (digest enrichment, RAG answers) need a chat model. Easiest is a free
+[Gemini key](https://aistudio.google.com/apikey) in `backend/.env` — it takes precedence and answers
+in seconds. For a fully local setup, compose already starts an **Ollama** service with
+`OLLAMA_MODEL=llama3.1`; pull the model once with `docker compose exec ollama ollama pull llama3.1`
+(~4.7GB). With neither, everything else still works.
 
 The schema is owned by Alembic, not the app. The container migrates on boot; by hand:
 `docker compose exec backend alembic upgrade head`. Upgrading a deployment that predates

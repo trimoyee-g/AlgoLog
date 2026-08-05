@@ -1,14 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Lock,
-  Download,
-  Github,
-  Star,
-  Search,
-  Mail,
-  ArrowRight,
-} from "lucide-react";
+import { Lock, Star, Search, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

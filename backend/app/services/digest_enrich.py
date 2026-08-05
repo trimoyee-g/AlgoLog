@@ -3,13 +3,13 @@
 Best-effort and additive: the deterministic stats, coach note, and review queue
 are computed and rendered exactly as before. This layer only *appends* a
 personalized paragraph, a few study tips, and a handful of fresh practice
-problems found via web search — and only if a local Ollama model is configured
-and reachable. Any failure returns None and the digest sends without it, the
-same way empty SMTP creds silently disable email.
+problems found via web search — and only if a chat model (Gemini or a local
+Ollama) is configured and reachable. Any failure returns None and the digest
+sends without it, the same way empty SMTP creds silently disable email.
 
 ponytail: web search is done deterministically (ddgs), the LLM only writes and
-curates the real URLs we hand it — a small local model driving an agentic search
-loop would hallucinate links. One LLM call, no LangGraph: this is a linear
+curates the real URLs we hand it — an LLM driving an agentic search loop would
+hallucinate links. One LLM call, no LangGraph: this is a linear
 stats -> search -> write pipeline with no branching or state.
 """
 import logging
@@ -17,6 +17,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.services.llm import chat_model, has_llm
 
 log = logging.getLogger(__name__)
 
@@ -74,19 +75,16 @@ def _prompt(stats: dict, topics: list[str], candidates: list[dict]) -> str:
 
 def enrich(stats: dict, weak: list[dict], recent: dict[str, dict] | None = None) -> Enrichment | None:
     """Return LLM enrichment, or None if disabled or anything fails. Never raises."""
-    if not settings.OLLAMA_MODEL:
+    if not has_llm():
         return None
     topics = topics_to_target(weak, stats, recent)
     if not topics:
         return None
     try:
-        from langchain_ollama import ChatOllama
-
         candidates = _search_problems(topics)
         if not candidates:
             return None
-        llm = ChatOllama(model=settings.OLLAMA_MODEL, base_url=settings.OLLAMA_BASE_URL,
-                         temperature=0.3).with_structured_output(Enrichment)
+        llm = chat_model(0.3).with_structured_output(Enrichment)
         return llm.invoke(_prompt(stats, topics, candidates))
     except Exception:
         log.exception("digest enrichment failed; sending without it")
@@ -109,8 +107,9 @@ def demo() -> None:
     assert topics_to_target([], {"by_tag": {}}) == []
     assert topics_to_target([], {"by_tag": {}}, {"dp": {"rate": 0.7}, "greedy": {"rate": 0.4}}) == ["greedy", "dp"]
 
-    # Disabled (empty model) short-circuits to None without touching network/LLM.
+    # Disabled (no model configured) short-circuits to None without touching network/LLM.
     settings.OLLAMA_MODEL = ""
+    settings.GEMINI_API_KEY = ""
     assert enrich({"total": 3, "solved_self": 1}, [{"tag": "dp"}]) is None
 
     rendered = render_enrichment(Enrichment(

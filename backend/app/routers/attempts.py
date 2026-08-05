@@ -97,12 +97,13 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
 @router.delete("/problems/{problem_id}", status_code=204)
 def delete_problem(problem_id: int, db: Session = Depends(get_db),
                    user_id: str = Depends(require_user)):
-    problem = db.query(Problem).filter(
+    # One statement: the user filter is the ownership check, attempts go with it
+    # via the FK's ON DELETE CASCADE.
+    deleted = db.query(Problem).filter(
         Problem.id == problem_id, Problem.user_id == user_id
-    ).first()
-    if not problem:
+    ).delete(synchronize_session=False)
+    if not deleted:
         raise HTTPException(404, "Problem not found")
-    db.delete(problem)  # attempts cascade-delete via the relationship
     db.commit()
 
 

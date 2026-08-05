@@ -54,7 +54,44 @@ class Problem(Base):
     embedding = Column(Vector(settings.EMBEDDING_DIM), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    attempts = relationship("Attempt", back_populates="problem", cascade="all, delete-orphan")
+    # passive_deletes: the DB cascade does it, so no SELECT-then-DELETE per attempt.
+    attempts = relationship("Attempt", back_populates="problem",
+                            cascade="all, delete-orphan", passive_deletes=True)
+
+
+class Document(Base):
+    """A study document the user uploaded (a DP chapter, an editorial PDF)."""
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    pages = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # passive_deletes: the DB cascade does it, so no SELECT-then-DELETE per chunk.
+    chunks = relationship("Chunk", back_populates="document",
+                          cascade="all, delete-orphan", passive_deletes=True)
+
+
+class Chunk(Base):
+    """One retrievable passage of a Document, with its own embedding."""
+    __tablename__ = "chunks"
+    # Retrieval filters on user_id then orders by distance; the FK to documents is
+    # never joined to filter, so user_id is denormalised here the same way
+    # Attempt carries it — one index, no join per vector search.
+    __table_args__ = (Index("ix_chunks_user", "user_id"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(
+        Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    ordinal = Column(Integer, nullable=False)  # position within the document
+    text = Column(Text, nullable=False)
+    embedding = Column(Vector(settings.EMBEDDING_DIM), nullable=True)
+
+    document = relationship("Document", back_populates="chunks")
 
 
 class Attempt(Base):
@@ -65,7 +102,9 @@ class Attempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    problem_id = Column(Integer, ForeignKey("problems.id"), nullable=False)
+    problem_id = Column(
+        Integer, ForeignKey("problems.id", ondelete="CASCADE"), nullable=False
+    )
     rating = Column(Integer, nullable=False)  # 1-5, user's own difficulty rating
     solved_self = Column(Boolean, nullable=False)  # did they solve it without external help
     notes = Column(Text, nullable=True)

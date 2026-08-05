@@ -33,6 +33,7 @@ from pydantic import AnyHttpUrl
 from app.config import settings
 from app.database import SessionLocal
 from app.deps import sync_user, verify_supabase_jwt
+from app.services.crag import ask as crag_ask
 from app.services.problems import list_problems
 from app.services.recommend import recommend
 from app.services.stats import overview_stats
@@ -120,6 +121,21 @@ async def get_weak_problems(
          "platform": p.platform.value}
         for p in problems
     ]
+
+
+@mcp.tool()
+async def search_study_material(question: str) -> dict:
+    """Search the user's own uploaded study material (PDFs they saved, e.g. a DP chapter).
+
+    Runs a corrective-RAG loop server-side: vector search, cross-encoder grading, and a query
+    rewrite if the first pass came back thin. Returns `passages` (graded extracts, each with a
+    `relevance` score and its source document) plus a `trace` of what the loop did. Prefer the
+    passages over general knowledge, and say so when they don't cover the question. `answer` is
+    populated only when the user runs a local LLM; ignore it when null and write the answer."""
+    user_id = _caller()
+    # Runs off the loop like every other tool here — the graph can retrieve twice and
+    # call a local model, which is far too slow to hold the event loop for.
+    return await _query(lambda db: crag_ask(db, user_id, question))
 
 
 @mcp.tool()

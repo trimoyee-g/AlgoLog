@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Brain, Home, Plus } from "lucide-react";
+import { BookOpen, Brain, Home, Plus } from "lucide-react";
 import { StatsCards } from "@/components/StatsCards";
 import { UnaidedRing } from "@/components/UnaidedRing";
 import { RatingDistribution } from "@/components/RatingDistribution";
@@ -20,6 +20,7 @@ import {
 import { Reveal } from "@/components/motion/Reveal";
 import { GlowOrb } from "@/components/motion/ParallaxLayer";
 import { DigestDialog } from "@/components/DigestDialog";
+import { StudyMaterialDialog } from "@/components/StudyMaterialDialog";
 import { getOverview, listProblems } from "@/lib/api";
 import type { ProblemFilters } from "@/lib/types";
 
@@ -44,6 +45,7 @@ export default function Dashboard() {
   const [appliedFilters, setAppliedFilters] = useState<ProblemFilters>({});
   const [addOpen, setAddOpen] = useState(false);
   const [digestOpen, setDigestOpen] = useState(false);
+  const [studyOpen, setStudyOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const overviewQuery = useQuery({ queryKey: ["overview"], queryFn: getOverview });
@@ -74,6 +76,10 @@ export default function Dashboard() {
               <Plus className="h-3.5 w-3.5" />
               Log attempt
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setStudyOpen(true)}>
+              <BookOpen className="h-3.5 w-3.5" />
+              Study material
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/review">
                 <Brain className="h-3.5 w-3.5" />
@@ -100,6 +106,8 @@ export default function Dashboard() {
       </Dialog>
 
       <DigestDialog open={digestOpen} onOpenChange={setDigestOpen} />
+
+      <StudyMaterialDialog open={studyOpen} onOpenChange={setStudyOpen} />
 
       <div className="relative overflow-hidden">
         <GlowOrb

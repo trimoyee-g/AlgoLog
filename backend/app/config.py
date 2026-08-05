@@ -23,9 +23,17 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     EMBEDDING_DIM: int = 384
 
-    # Optional local LLM (Ollama) that enriches the weekly digest with a
-    # personalized paragraph, study tips, and web-searched problems. Empty model
-    # disables it — the digest still sends its deterministic content, unchanged.
+    # Cross-encoder that grades retrieved chunks
+    RERANK_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+    MAX_UPLOAD_MB: int = 20
+
+    # Chat model for the CRAG answer and the digest enrichment. Gemini wins when a
+    # key is set; Ollama is the local fallback; neither configured disables both
+    # features — the digest still sends its deterministic content and /ask still
+    # returns graded passages for the caller to write from.
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     OLLAMA_MODEL: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 

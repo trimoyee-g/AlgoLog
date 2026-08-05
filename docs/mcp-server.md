@@ -1,7 +1,8 @@
 # MCP Server
 
-Three tools — `get_weak_problems`, `get_stats_overview`, and `get_recommended_problem` (the
-reasoned "what next", ranked with `reason` and `priority`) — served two ways.
+Four tools — `get_weak_problems`, `get_stats_overview`, `get_recommended_problem` (the
+reasoned "what next", ranked with `reason` and `priority`), and `search_study_material`
+(corrective-RAG search over the user's uploaded PDFs) — served two ways.
 
 Both paths call the same service layer as the REST API (see
 [Architecture](architecture.md)), so behavior and results are identical regardless of client.
