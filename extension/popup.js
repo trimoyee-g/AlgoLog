@@ -65,7 +65,7 @@ document.getElementById("save").addEventListener("click", async () => {
   statusEl.textContent = "";
 
   try {
-    const resp = await fetch(`${BACKEND_URL}/api/attempts`, {
+    const resp = await fetch(`${BACKEND_URL}/api/v1/attempts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

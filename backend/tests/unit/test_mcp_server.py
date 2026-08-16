@@ -175,18 +175,18 @@ def sent(monkeypatch):
 
 
 def test_get_authorizes_and_drops_none_params(sent):
-    body = asyncio.run(mcp_server._get("/api/problems", platform=None, min_rating=4))
+    body = asyncio.run(mcp_server._get("/api/v1/problems", platform=None, min_rating=4))
 
     assert body == '{"ok": true}'
     assert sent["init"]["headers"] == {"Authorization": "Bearer at-1"}
-    assert sent["get"]["url"] == f"{mcp_server.BACKEND_URL}/api/problems"
+    assert sent["get"]["url"] == f"{mcp_server.BACKEND_URL}/api/v1/problems"
     assert sent["get"]["params"] == {"min_rating": 4}  # platform=None omitted entirely
 
 
 def test_get_weak_problems_defaults(sent):
     asyncio.run(mcp_server.get_weak_problems())
 
-    assert sent["get"]["url"].endswith("/api/problems")
+    assert sent["get"]["url"].endswith("/api/v1/problems")
     assert sent["get"]["params"] == {"min_rating": 4, "solved_self": "false"}
 
 
@@ -199,11 +199,11 @@ def test_get_weak_problems_passes_filters_through(sent):
 def test_get_stats_overview(sent):
     asyncio.run(mcp_server.get_stats_overview())
 
-    assert sent["get"]["url"].endswith("/api/stats/overview")
+    assert sent["get"]["url"].endswith("/api/v1/stats/overview")
 
 
 def test_get_recommended_problem(sent):
     asyncio.run(mcp_server.get_recommended_problem(count=3))
 
-    assert sent["get"]["url"].endswith("/api/stats/recommend")
+    assert sent["get"]["url"].endswith("/api/v1/stats/recommend")
     assert sent["get"]["params"] == {"count": 3}

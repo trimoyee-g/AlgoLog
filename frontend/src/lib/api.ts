@@ -59,7 +59,7 @@ async function request<T>(
 }
 
 export function getOverview() {
-  return request<Overview>("/api/stats/overview");
+  return request<Overview>("/api/v1/stats/overview");
 }
 
 export function listProblems(filters: ProblemFilters = {}) {
@@ -70,69 +70,69 @@ export function listProblems(filters: ProblemFilters = {}) {
   if (filters.platform) params.set("platform", filters.platform);
   if (filters.tag) params.set("tag", filters.tag);
   const qs = params.toString();
-  return request<Problem[]>(`/api/problems${qs ? `?${qs}` : ""}`);
+  return request<Problem[]>(`/api/v1/problems${qs ? `?${qs}` : ""}`);
 }
 
 export function getReviewQueue(dueOnly = true) {
-  return request<ReviewItem[]>(`/api/review?due_only=${dueOnly}`);
+  return request<ReviewItem[]>(`/api/v1/review?due_only=${dueOnly}`);
 }
 
 export function getRecommendation(count = 1) {
-  return request<Recommendation[]>(`/api/stats/recommend?count=${count}`);
+  return request<Recommendation[]>(`/api/v1/stats/recommend?count=${count}`);
 }
 
 export function addAttempt(payload: AttemptCreate) {
-  return request<{ problem_id: number; attempt_id: number }>("/api/attempts", {
+  return request<{ problem_id: number; attempt_id: number }>("/api/v1/attempts", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export function updateProblem(id: number, payload: ProblemUpdate) {
-  return request<Problem>(`/api/problems/${id}`, {
+  return request<Problem>(`/api/v1/problems/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteProblem(id: number) {
-  return request<void>(`/api/problems/${id}`, {
+  return request<void>(`/api/v1/problems/${id}`, {
     method: "DELETE",
   });
 }
 
 export function getSimilar(problemId: number, limit = 5) {
   return request<SimilarProblem[]>(
-    `/api/problems/${problemId}/similar?limit=${limit}`
+    `/api/v1/problems/${problemId}/similar?limit=${limit}`
   );
 }
 
 export function getDigestPreview() {
-  return request<{ note?: string; body: string }>("/api/stats/digest/preview");
+  return request<{ note?: string; body: string }>("/api/v1/stats/digest/preview");
 }
 
 export function sendDigestNow() {
-  return request<{ note?: string }>("/api/stats/digest/send-now", {
+  return request<{ note?: string }>("/api/v1/stats/digest/send-now", {
     method: "POST",
   });
 }
 
 export function listDocuments() {
-  return request<StudyDocument[]>("/api/documents");
+  return request<StudyDocument[]>("/api/v1/documents");
 }
 
 export function uploadDocument(file: File) {
   const body = new FormData();
   body.append("file", file);
-  return request<StudyDocument>("/api/documents", { method: "POST", body });
+  return request<StudyDocument>("/api/v1/documents", { method: "POST", body });
 }
 
 export function deleteDocument(id: number) {
-  return request<void>(`/api/documents/${id}`, { method: "DELETE" });
+  return request<void>(`/api/v1/documents/${id}`, { method: "DELETE" });
 }
 
 export function askDocuments(question: string) {
-  return request<AskResult>("/api/documents/ask", {
+  return request<AskResult>("/api/v1/documents/ask", {
     method: "POST",
     body: JSON.stringify({ question }),
   });

@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import require_user
+from app.schemas import ReviewItemOut
 from app.services.recommend import review_queue
 
-router = APIRouter(prefix="/api/review", tags=["review"])
+router = APIRouter(prefix="/api/v1/review", tags=["review"])
 
 
-@router.get("")
+@router.get("", response_model=list[ReviewItemOut])
 def review_endpoint(
     due_only: bool = Query(default=True),
     db: Session = Depends(get_db),

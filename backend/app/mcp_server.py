@@ -102,7 +102,7 @@ async def get_weak_problems(
 ) -> str:
     """Get problems the user rated as difficult (rating >= threshold) or could not solve themselves."""
     return await _get(
-        "/api/problems",
+        "/api/v1/problems",
         min_rating=min_rating,
         solved_self=str(solved_self).lower(),
         platform=platform,
@@ -113,7 +113,7 @@ async def get_weak_problems(
 async def get_stats_overview() -> str:
     """Get overall practice stats: total problems, total attempts, solved-unaided count,
     hard-rated count, and unaided_rate (0-1). Use for any question about totals or solve/unaided rate."""
-    return await _get("/api/stats/overview")
+    return await _get("/api/v1/stats/overview")
 
 
 @mcp.tool()
@@ -124,7 +124,7 @@ async def get_recommended_problem(
     with weak-topic detection into a ranked list, each with a 'reason' string and a 'priority'
     (high = overdue AND a weak topic). Use this to coach the user unprompted, e.g. 'you're due
     to revisit X, and you tend to struggle with dp'."""
-    return await _get("/api/stats/recommend", count=count)
+    return await _get("/api/v1/stats/recommend", count=count)
 
 
 @mcp.tool()
@@ -140,7 +140,7 @@ async def search_study_material(
     and say so when they don't cover the question. `answer` is populated only when the
     user runs a local LLM; ignore it when null and write the answer yourself."""
     # The graph can rewrite-and-retry, so it needs longer than a plain GET.
-    return await _post("/api/documents/ask", timeout=120.0, question=question)
+    return await _post("/api/v1/documents/ask", timeout=120.0, question=question)
 
 
 if __name__ == "__main__":

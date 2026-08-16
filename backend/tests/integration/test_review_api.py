@@ -1,5 +1,5 @@
-"""Integration: the coaching endpoints — /api/review (SM-2 queue),
-/api/stats/weak-topics, /api/stats/recommend."""
+"""Integration: the coaching endpoints — /api/v1/review (SM-2 queue),
+/api/v1/stats/weak-topics, /api/v1/stats/recommend."""
 from datetime import datetime, timedelta
 
 import pytest
@@ -28,7 +28,7 @@ def test_review_returns_only_due_problems_by_default(client, db_session):
     _problem(db_session, "https://fresh", "dp", [(3, True, 0)])     # solved today -> due tomorrow
     _problem(db_session, "https://never-tried", "dp")               # no attempts -> no schedule
 
-    due = client.get("/api/review").json()
+    due = client.get("/api/v1/review").json()
 
     assert [r["url"] for r in due] == ["https://overdue"]
     assert due[0]["overdue_days"] == 4
@@ -40,7 +40,7 @@ def test_review_due_only_false_returns_the_whole_schedule(client, db_session):
     _problem(db_session, "https://fresh", "dp", [(3, True, 0)])
     _problem(db_session, "https://never-tried", "dp")  # still excluded: nothing to schedule
 
-    all_scheduled = client.get("/api/review?due_only=false").json()
+    all_scheduled = client.get("/api/v1/review?due_only=false").json()
 
     assert [r["url"] for r in all_scheduled] == ["https://overdue", "https://fresh"]  # soonest-due first
 
@@ -53,7 +53,7 @@ def test_weak_topics_needs_enough_recent_evidence(client, db_session):
     # stale evidence outside the 90-day window must not brand a topic weak
     _problem(db_session, "https://old", "trees", [(5, False, 200), (5, False, 201), (5, False, 202)])
 
-    weak = client.get("/api/stats/weak-topics").json()
+    weak = client.get("/api/v1/stats/weak-topics").json()
 
     assert [w["tag"] for w in weak] == ["dp"]
     assert weak[0] == {"tag": "dp", "total_attempts": 4, "solved_unaided": 1, "solved_rate": 0.25}
@@ -67,7 +67,7 @@ def test_recommend_ranks_overdue_weak_problems_first_with_reasons(client, db_ses
     _problem(db_session, "https://greedy-fresh", "greedy", [(2, True, 0)])  # not due, not weak
     _problem(db_session, "https://never-tried", "dp")                       # unschedulable
 
-    recs = client.get("/api/stats/recommend?count=5").json()
+    recs = client.get("/api/v1/stats/recommend?count=5").json()
 
     assert "https://never-tried" not in [r["url"] for r in recs]
     top = recs[0]
@@ -82,8 +82,8 @@ def test_recommend_count_defaults_to_one(client, db_session):
     _problem(db_session, "https://a", "dp", [(5, False, 9)])
     _problem(db_session, "https://b", "dp", [(5, False, 9)])
 
-    assert len(client.get("/api/stats/recommend").json()) == 1
+    assert len(client.get("/api/v1/stats/recommend").json()) == 1
 
 
 def test_recommend_is_empty_with_nothing_logged(client, db_session):
-    assert client.get("/api/stats/recommend").json() == []
+    assert client.get("/api/v1/stats/recommend").json() == []

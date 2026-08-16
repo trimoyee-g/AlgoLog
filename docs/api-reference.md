@@ -5,23 +5,23 @@ Interactive docs are also served at `/docs` (Swagger) once the backend is runnin
 
 | Method | Path                            | Description                                                                              |
 | ------ | ------------------------------- | ----------------------------------------------------------------------------------------- |
-| POST   | `/api/attempts`                 | Log an attempt (upserts the problem by user + URL, appends an attempt row)               |
-| GET    | `/api/problems`                 | List problems and attempts; filter by `min_rating`, `solved_self`, `platform`, `tag`     |
-| PATCH  | `/api/problems/{id}`            | Update a problem; `rating` / `solved_self` update (or create) the latest attempt         |
-| DELETE | `/api/problems/{id}`            | Delete a problem (attempts cascade)                                                       |
-| GET    | `/api/problems/{id}/similar`    | Embedding-similar problems from your history                                             |
-| GET    | `/api/review?due_only=true`     | SM-2 review queue, soonest-due first; `due_only=false` returns the whole schedule         |
-| GET    | `/api/stats/overview`           | Totals: problems, attempts, solved-unaided, hard-rated (≥4)                              |
-| GET    | `/api/stats/weekly`             | Last-7-days breakdown by platform and tag                                                |
-| GET    | `/api/stats/weak-topics`        | Tags whose recent solved-unaided rate is below threshold, with enough samples            |
-| GET    | `/api/stats/recommend?count=1`  | Ranked "what to do next" — due reviews + weak topics, each with `reason` and `priority`  |
-| POST   | `/api/stats/digest/send-now`    | Send your weekly digest immediately                                                      |
-| POST   | `/api/documents`                | Upload a study PDF (multipart `file`); text is extracted, chunked and embedded           |
-| GET    | `/api/documents`                | List uploaded study material with page and chunk counts                                  |
-| DELETE | `/api/documents/{id}`           | Delete a document (chunks cascade)                                                        |
-| POST   | `/api/documents/ask`            | Ask a question against your material — runs the corrective-RAG loop                       |
+| POST   | `/api/v1/attempts`                 | Log an attempt (upserts the problem by user + URL, appends an attempt row)               |
+| GET    | `/api/v1/problems`                 | List problems and attempts; filter by `min_rating`, `solved_self`, `platform`, `tag`     |
+| PATCH  | `/api/v1/problems/{id}`            | Update a problem; `rating` / `solved_self` update (or create) the latest attempt         |
+| DELETE | `/api/v1/problems/{id}`            | Delete a problem (attempts cascade)                                                       |
+| GET    | `/api/v1/problems/{id}/similar`    | Embedding-similar problems from your history                                             |
+| GET    | `/api/v1/review?due_only=true`     | SM-2 review queue, soonest-due first; `due_only=false` returns the whole schedule         |
+| GET    | `/api/v1/stats/overview`           | Totals: problems, attempts, solved-unaided, hard-rated (≥4)                              |
+| GET    | `/api/v1/stats/weekly`             | Last-7-days breakdown by platform and tag                                                |
+| GET    | `/api/v1/stats/weak-topics`        | Tags whose recent solved-unaided rate is below threshold, with enough samples            |
+| GET    | `/api/v1/stats/recommend?count=1`  | Ranked "what to do next" — due reviews + weak topics, each with `reason` and `priority`  |
+| POST   | `/api/v1/stats/digest/send-now`    | Send your weekly digest immediately                                                      |
+| POST   | `/api/v1/documents`                | Upload a study PDF (multipart `file`); text is extracted, chunked and embedded           |
+| GET    | `/api/v1/documents`                | List uploaded study material with page and chunk counts                                  |
+| DELETE | `/api/v1/documents/{id}`           | Delete a document (chunks cascade)                                                        |
+| POST   | `/api/v1/documents/ask`            | Ask a question against your material — runs the corrective-RAG loop                       |
 
-`POST /api/documents/ask` takes `{"question": "..."}` and returns
+`POST /api/v1/documents/ask` takes `{"question": "..."}` and returns
 `{question, answer, passages, web, trace}`. `passages` are the graded extracts, each with a
 `relevance` score and its source document; `trace` records what the loop did (retrieve, rewrite,
 web fallback). `answer` is `null` unless `OLLAMA_MODEL` is set — without a local model the

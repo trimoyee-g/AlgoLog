@@ -118,7 +118,7 @@ export interface AskResult {
   trace: string[];
 }
 
-/** `/api/stats/recommend` — the ranked pick, with the reason the backend already builds. */
+/** `/api/v1/stats/recommend` — the ranked pick, with the reason the backend already builds. */
 export type Priority = "high" | "medium" | "low";
 
 export interface Recommendation {

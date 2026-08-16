@@ -6,11 +6,11 @@ from app.config import settings
 from app.database import get_db
 from app.deps import require_user
 from app.models import Document
-from app.schemas import AskRequest, DocumentOut
+from app.schemas import AskRequest, AskResponse, DocumentOut
 from app.services import crag
 from app.services.documents import ExtractionError, ingest_pdf, list_documents
 
-router = APIRouter(prefix="/api/documents", tags=["documents"])
+router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
 _CHUNK = 1024 * 1024
 
@@ -70,7 +70,7 @@ def delete_document(document_id: int, db: Session = Depends(get_db),
     db.commit()
 
 
-@router.post("/ask")
+@router.post("/ask", response_model=AskResponse)
 def ask_documents(payload: AskRequest, db: Session = Depends(get_db),
                   user_id: str = Depends(require_user)):
     """Ask a question against the uploaded material.

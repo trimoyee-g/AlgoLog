@@ -96,12 +96,12 @@ instead of twenty generations. The chat model only routes, rewrites, and writes.
 ```mermaid
 sequenceDiagram
     participant U as User (extension/dashboard)
-    participant API as FastAPI /api/attempts
+    participant API as FastAPI /api/v1/attempts
     participant Auth as deps.py
     participant Svc as Service layer
     participant DB as Postgres + pgvector
 
-    U->>API: POST /api/attempts (Bearer JWT, url, rating, solved_self, tags)
+    U->>API: POST /api/v1/attempts (Bearer JWT, url, rating, solved_self, tags)
     API->>Auth: verify JWT against Supabase JWKS
     Auth-->>API: user_id
     API->>Svc: upsert_attempt(user_id, payload)
@@ -117,11 +117,11 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Caller (dashboard or MCP client)
-    participant API as /api/stats/recommend or MCP tool
+    participant API as /api/v1/stats/recommend or MCP tool
     participant Svc as Service layer
     participant DB as Postgres
 
-    C->>API: GET /api/stats/recommend?count=1
+    C->>API: GET /api/v1/stats/recommend?count=1
     API->>Svc: recommend_next(user_id, count)
     Svc->>DB: fold SM-2 over attempts -> due reviews
     Svc->>DB: compute 90-day solved-unaided rate per tag -> weak topics

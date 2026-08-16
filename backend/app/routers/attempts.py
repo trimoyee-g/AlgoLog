@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.deps import require_user
 from app.models import Problem, Attempt, Platform
-from app.schemas import AttemptCreate, ProblemOut, ProblemUpdate
+from app.schemas import AttemptCreate, AttemptLogged, ProblemOut, ProblemUpdate
 from app.services.embeddings import embed_text
 from app.services.problems import list_problems
 
-router = APIRouter(prefix="/api", tags=["attempts"])
+router = APIRouter(prefix="/api/v1", tags=["attempts"])
 
 
-@router.post("/attempts")
+@router.post("/attempts", response_model=AttemptLogged)
 def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
                 user_id: str = Depends(require_user)):
     """
@@ -29,7 +29,7 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
         user_id=user_id,
         url=payload.url,
         title=payload.title,
-        platform=Platform(payload.platform),
+        platform=payload.platform,
         tags=payload.tags,
         embedding=embed_text(payload.tags),
     ).on_conflict_do_update(
@@ -55,9 +55,13 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
                    user_id: str = Depends(require_user)):
     """Edit a problem's fields. rating/solved_self update the latest attempt
     (or create one if the problem has none yet)."""
+    # Embedded before the lock so no model inference runs while the row is held.
+    embedding = embed_text(payload.tags) if payload.tags is not None else None
+
     problem = (
         db.query(Problem).options(joinedload(Problem.attempts))
         .filter(Problem.id == problem_id, Problem.user_id == user_id)
+        .with_for_update(of=Problem)
         .first()
     )
     if not problem:
@@ -68,12 +72,10 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
     if payload.title is not None:
         problem.title = payload.title
     if payload.platform is not None:
-        problem.platform = Platform(payload.platform)
+        problem.platform = payload.platform
     if payload.tags is not None:
         problem.tags = payload.tags
-
-    if payload.tags is not None:
-        problem.embedding = embed_text(payload.tags)
+        problem.embedding = embedding
 
     if payload.rating is not None or payload.solved_self is not None:
         latest = max(problem.attempts, key=lambda a: a.created_at) if problem.attempts else None
@@ -111,7 +113,7 @@ def delete_problem(problem_id: int, db: Session = Depends(get_db),
 def get_problems(
     min_rating: Optional[int] = Query(default=None, ge=1, le=5),
     solved_self: Optional[bool] = Query(default=None),
-    platform: Optional[str] = Query(default=None),
+    platform: Optional[Platform] = Query(default=None),
     tag: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     user_id: str = Depends(require_user),

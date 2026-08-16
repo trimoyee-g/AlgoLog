@@ -45,7 +45,7 @@ def _no_models(monkeypatch):
 def test_upload_extracts_chunks_and_persists(client, db_session):
     pdf = make_pdf("Dynamic programming needs a state and a transition rule.")
 
-    r = client.post("/api/documents", files={"file": ("dp-notes.pdf", pdf, "application/pdf")})
+    r = client.post("/api/v1/documents", files={"file": ("dp-notes.pdf", pdf, "application/pdf")})
 
     assert r.status_code == 201, r.text
     body = r.json()
@@ -59,13 +59,13 @@ def test_upload_extracts_chunks_and_persists(client, db_session):
 
 
 def test_non_pdf_is_rejected(client):
-    r = client.post("/api/documents", files={"file": ("notes.txt", b"hello", "text/plain")})
+    r = client.post("/api/v1/documents", files={"file": ("notes.txt", b"hello", "text/plain")})
     assert r.status_code == 400
     assert "PDF" in r.json()["detail"]
 
 
 def test_unreadable_pdf_is_rejected(client):
-    r = client.post("/api/documents", files={"file": ("x.pdf", b"%PDF-1.4 garbage", "application/pdf")})
+    r = client.post("/api/v1/documents", files={"file": ("x.pdf", b"%PDF-1.4 garbage", "application/pdf")})
     assert r.status_code == 400
 
 
@@ -75,16 +75,16 @@ def test_oversized_upload_is_rejected(client, monkeypatch):
     monkeypatch.setattr(router_mod.settings, "MAX_UPLOAD_MB", 1)
 
     big = b"%PDF-1.4" + b"x" * (1024 * 1024 + 10)
-    r = client.post("/api/documents", files={"file": ("big.pdf", big, "application/pdf")})
+    r = client.post("/api/v1/documents", files={"file": ("big.pdf", big, "application/pdf")})
     assert r.status_code == 413
 
 
 def test_ask_returns_passages_from_the_uploaded_document(client):
     pdf = make_pdf("Memoize the recursion, then flip it bottom-up for dynamic programming.")
-    upload = client.post("/api/documents", files={"file": ("dp.pdf", pdf, "application/pdf")})
+    upload = client.post("/api/v1/documents", files={"file": ("dp.pdf", pdf, "application/pdf")})
     assert upload.status_code == 201
 
-    r = client.post("/api/documents/ask", json={"question": "how do I get better at dp?"})
+    r = client.post("/api/v1/documents/ask", json={"question": "how do I get better at dp?"})
 
     assert r.status_code == 200
     body = r.json()
@@ -96,7 +96,7 @@ def test_ask_returns_passages_from_the_uploaded_document(client):
 
 
 def test_ask_on_an_empty_corpus_returns_no_passages(client):
-    r = client.post("/api/documents/ask", json={"question": "anything at all"})
+    r = client.post("/api/v1/documents/ask", json={"question": "anything at all"})
     assert r.status_code == 200
     assert r.json()["passages"] == []
 
@@ -110,10 +110,10 @@ def test_documents_are_scoped_to_their_owner(client, db_session):
                          text="their private notes on dp", embedding=fake_embedding("dp")))
     db_session.commit()
 
-    listed = client.get("/api/documents").json()
+    listed = client.get("/api/v1/documents").json()
     assert all(d["filename"] != "theirs.pdf" for d in listed)
 
-    asked = client.post("/api/documents/ask", json={"question": "dp"}).json()
+    asked = client.post("/api/v1/documents/ask", json={"question": "dp"}).json()
     assert all("private" not in p["text"] for p in asked["passages"])
 
 
@@ -129,7 +129,7 @@ def test_delete_cascades_to_chunks(client, db_session):
     db_session.commit()
     doc_id = doc.id  # read before the delete: the instance can't refresh afterwards
 
-    assert client.delete(f"/api/documents/{doc_id}").status_code == 204
+    assert client.delete(f"/api/v1/documents/{doc_id}").status_code == 204
 
     assert db_session.query(Document).filter(Document.id == doc_id).first() is None
     assert db_session.query(Chunk).filter(Chunk.document_id == doc_id).count() == 0
@@ -140,16 +140,16 @@ def test_delete_someone_elses_document_is_404(client, db_session):
     db_session.add(other)
     db_session.commit()
 
-    assert client.delete(f"/api/documents/{other.id}").status_code == 404
+    assert client.delete(f"/api/v1/documents/{other.id}").status_code == 404
     assert db_session.query(Document).filter(Document.id == other.id).first() is not None
 
 
 def test_list_reports_chunk_counts(client):
     pdf = make_pdf("Sliding window keeps a running aggregate over a contiguous range.")
-    created = client.post("/api/documents",
+    created = client.post("/api/v1/documents",
                           files={"file": ("sw.pdf", pdf, "application/pdf")}).json()
 
-    listed = client.get("/api/documents").json()
+    listed = client.get("/api/v1/documents").json()
     mine = [d for d in listed if d["id"] == created["id"]]
     assert len(mine) == 1
     assert mine[0]["chunks"] == created["chunks"] > 0

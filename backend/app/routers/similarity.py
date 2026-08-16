@@ -6,7 +6,7 @@ from app.deps import require_user
 from app.schemas import SimilarProblemOut
 from app.services.similarity import similar_problems
 
-router = APIRouter(prefix="/api", tags=["similarity"])
+router = APIRouter(prefix="/api/v1", tags=["similarity"])
 
 
 @router.get("/problems/{problem_id}/similar", response_model=list[SimilarProblemOut])
