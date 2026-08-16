@@ -1,9 +1,9 @@
 """add documents + chunks for study-material RAG
 
-Study material (uploaded PDFs) lives in the same database as everything else so
-retrieval over it can be filtered and ranked alongside the existing pgvector
-query on problems.embedding — a separate document store would put the two
-corpora behind different engines with no way to rank one against the other.
+Study material (uploaded PDFs) lives in the same database as everything else — not
+to rank it against problems.embedding (nothing joins the two corpora), but so the
+chunks get real foreign keys, a cascading delete from documents, and an ingest that
+commits the document and its vectors in one transaction.
 
 Revision ID: 0005
 Revises: 0004

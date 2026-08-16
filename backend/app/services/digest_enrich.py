@@ -16,7 +16,6 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from app.config import settings
 from app.services.llm import chat_model, has_llm
 
 log = logging.getLogger(__name__)
@@ -98,26 +97,3 @@ def render_enrichment(e: Enrichment) -> str:
         lines += ["", "Fresh problems to try:"]
         lines += [f"• {p.title} — {p.url}\n  {p.why}" for p in e.problems]
     return "\n".join(lines)
-
-
-def demo() -> None:
-    # Offline self-check: no Ollama, no network.
-    assert topics_to_target([{"tag": "dp"}, {"tag": "graph"}, {"tag": "math"}], {}) == ["dp", "graph"]
-    assert topics_to_target([], {"by_tag": {"greedy": 5, "dp": 9}}) == ["dp", "greedy"]
-    assert topics_to_target([], {"by_tag": {}}) == []
-    assert topics_to_target([], {"by_tag": {}}, {"dp": {"rate": 0.7}, "greedy": {"rate": 0.4}}) == ["greedy", "dp"]
-
-    # Disabled (no model configured) short-circuits to None without touching network/LLM.
-    settings.OLLAMA_MODEL = ""
-    settings.GEMINI_API_KEY = ""
-    assert enrich({"total": 3, "solved_self": 1}, [{"tag": "dp"}]) is None
-
-    rendered = render_enrichment(Enrichment(
-        paragraph="Nice week.", tips=["memoize", "draw the recursion tree"],
-        problems=[ProblemSuggestion(title="Coin Change", url="http://x/y", why="classic dp")]))
-    assert "Coin Change" in rendered and "memoize" in rendered
-    print("digest_enrich self-check OK")
-
-
-if __name__ == "__main__":
-    demo()

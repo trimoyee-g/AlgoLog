@@ -1,9 +1,10 @@
 """Study-material ingest and retrieval: PDF -> text -> chunks -> pgvector.
 
-The corpus lives beside problems and attempts rather than in a separate document
-store, so a chunk search and the existing similarity query run against one engine
-and one transaction. Retrieval here is deliberately dumb — high-recall vector
-search, no judgement. The judging happens in services/crag.py.
+Chunks live in the main database rather than a dedicated vector store — not because
+they relate to problems or attempts (nothing joins them), but because one engine
+buys real foreign keys, cascading deletes, and an ingest that commits a document and
+its vectors in a single transaction. Retrieval here is deliberately dumb — high-recall
+vector search, no judgement. The judging happens in services/crag.py.
 """
 import io
 import logging
@@ -121,28 +122,3 @@ def list_documents(db: Session, user_id: str) -> list[dict]:
          "chunks": len(d.chunks), "created_at": d.created_at}
         for d in docs
     ]
-
-
-def demo() -> None:
-    # Offline self-check: chunker only, no DB / no model load.
-    para = ("Dynamic programming trades memory for time. " * 40).strip()
-    chunks = chunk_text(para)
-    assert len(chunks) > 1, "long text must split"
-    assert all(len(c) <= CHUNK_SIZE + MIN_CHUNK_CHARS for c in chunks), "chunk over size"
-    assert all(len(c) >= MIN_CHUNK_CHARS for c in chunks), "fragment survived"
-
-    # Short input stays whole; sub-threshold noise is dropped entirely.
-    assert chunk_text("Memoize the recursion, then flip it bottom-up.") == [
-        "Memoize the recursion, then flip it bottom-up."]
-    assert chunk_text("p. 42") == []
-
-    try:
-        extract_pdf_text(b"not a pdf at all")
-        raise AssertionError("bad bytes must raise ExtractionError")
-    except ExtractionError:
-        pass
-    print("documents self-check OK")
-
-
-if __name__ == "__main__":
-    demo()

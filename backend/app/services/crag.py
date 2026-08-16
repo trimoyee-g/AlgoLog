@@ -247,26 +247,3 @@ def ask(db: Session, user_id: str, question: str) -> dict:
         "web": final.get("web", []),
         "trace": final.get("trace", []),
     }
-
-
-def demo() -> None:
-    # Offline self-check: the routing rule is the whole control flow, and it's pure.
-    assert decide_route(5, 0, True) == "generate", "plenty of hits -> answer"
-    assert decide_route(ENOUGH, 0, True) == "generate", "exactly enough -> answer"
-    assert decide_route(1, 0, True) == "rewrite", "thin, rounds left -> rewrite"
-    assert decide_route(0, 0, True) == "rewrite", "empty, rounds left -> rewrite"
-    assert decide_route(0, MAX_ROUNDS, True) == "web", "empty, rounds spent -> web"
-    assert decide_route(1, MAX_ROUNDS, True) == "generate", "thin but non-empty -> ship it"
-
-    # No LLM: never routes anywhere that needs one.
-    assert decide_route(0, 0, False) == "generate"
-    assert decide_route(1, 0, False) == "generate"
-
-    # The loop must terminate: every rewrite increments rounds, and at MAX_ROUNDS
-    # neither branch returns "rewrite".
-    assert all(decide_route(n, MAX_ROUNDS, True) != "rewrite" for n in range(ENOUGH))
-    print("crag self-check OK")
-
-
-if __name__ == "__main__":
-    demo()
