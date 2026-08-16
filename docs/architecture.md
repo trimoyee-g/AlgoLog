@@ -1,72 +1,15 @@
 # Architecture
 
-## System diagram
-
-```mermaid
-flowchart TB
-    subgraph clients["Clients"]
-        EXT["Browser extension<br/>(MV3 · popup rate)"]
-        WEB["React dashboard<br/>(Vite · TS · Tailwind)"]
-        MCPC["Claude Desktop / Code<br/>(MCP client)"]
-        STDIO["mcp_server.py<br/>(stdio, single-user)"]
-    end
-
-    SB[("Supabase auth<br/>issues JWTs · JWKS")]
-
-    subgraph api["FastAPI backend :8000"]
-        REST["REST routers<br/>attempts · review · similarity · stats"]
-        MCPH["Hosted MCP<br/>POST /mcp (Streamable HTTP)"]
-        AUTH["deps.py — verify JWT vs JWKS<br/>ES256/RS256 · upsert user"]
-        SVC["Service layer<br/>problems · similarity · stats · recommend<br/>SM-2 scheduler · weak topics · embeddings"]
-        JOB["APScheduler<br/>Sun 18:00 weekly digest"]
-    end
-
-    ST["sentence-transformers<br/>all-MiniLM-L6-v2 (in-process, cached)"]
-    PG[("PostgreSQL 16 + pgvector<br/>users · problems · attempts · digest_sends")]
-    OLL["Ollama (optional)<br/>digest enrichment"]
-    DDG["ddgs web search<br/>(keyless)"]
-    SMTP["SMTP → weekly email"]
-
-    EXT -- "session via bridge<br/>content script" --> WEB
-    WEB -- "OAuth" --> SB
-    STDIO -- "own refresh token<br/>(mcp_login.py)" --> SB
-
-    EXT -- "Bearer JWT" --> REST
-    WEB -- "Bearer JWT" --> REST
-    STDIO -- "Bearer JWT · HTTP" --> REST
-    MCPC -- "Bearer JWT" --> MCPH
-
-    REST --> AUTH
-    MCPH --> AUTH
-    AUTH -. "fetch public keys" .-> SB
-    AUTH --> SVC
-    JOB --> SVC
-
-    SVC --> ST
-    SVC --> PG
-    JOB -- "at-most-once claim<br/>(digest_sends)" --> PG
-    JOB --> SMTP
-    JOB -. "optional" .-> OLL
-    OLL -. "curates real URLs from" .-> DDG
-```
-
-Three clients — the browser extension, the React dashboard, and any MCP client (Claude
-Desktop, Claude Code, or the bundled stdio server) — all authenticate against Supabase and
-call the same FastAPI backend with a bearer JWT. `deps.py` verifies every token against the
-project's JWKS before the service layer runs; the service layer is the single place that
-touches Postgres, the embedding model, and the SM-2 scheduler, so REST and MCP requests get
-identical behavior.
-
 ## Data model
 
 | Table          | Key columns                                                              | Notes                                                                 |
-| -------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `users`        | `id` (Supabase UUID), `email`                                            | Upserted on first verified token; no password ever stored              |
-| `problems`     | `id`, `user_id`, `url`, `platform`, `title`, `tags`, `embedding`         | One row per (user, URL); `embedding` is a pgvector column over `tags`  |
-| `attempts`     | `id`, `problem_id`, `rating` (1–5), `solved_self`, `notes`, `created_at` | Append-only — repeat attempts add rows, never overwrite history         |
-| `digest_sends` | `user_id`, `week_start`, `sent_at`                                       | At-most-once claim table so the weekly job can't double-send            |
-| `documents`    | `id`, `user_id`, `filename`, `pages`                                     | One uploaded study PDF; the file itself isn't kept, only its text       |
-| `chunks`       | `id`, `document_id`, `user_id`, `ordinal`, `text`, `embedding`           | Retrievable passages; `user_id` denormalised so search needs no join    |
+| -------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `users`        | `id` (Supabase UUID), `email`                                            | Upserted on first verified token; no password ever stored             |
+| `problems`     | `id`, `user_id`, `url`, `platform`, `title`, `tags`, `embedding`         | One row per (user, URL); `embedding` is a pgvector column over `tags` |
+| `attempts`     | `id`, `problem_id`, `rating` (1–5), `solved_self`, `notes`, `created_at` | Append-only — repeat attempts add rows, never overwrite history       |
+| `digest_sends` | `user_id`, `week_start`, `sent_at`                                       | At-most-once claim table so the weekly job can't double-send          |
+| `documents`    | `id`, `user_id`, `filename`, `pages`                                     | One uploaded study PDF; the file itself isn't kept, only its text     |
+| `chunks`       | `id`, `document_id`, `user_id`, `ordinal`, `text`, `embedding`           | Retrievable passages; `user_id` denormalised so search needs no join  |
 
 The SM-2 schedule (interval, ease, repetitions) and the weak-topic rate are not stored —
 both are derived by folding over `attempts` at read time, so the schedule is always a pure
@@ -87,7 +30,7 @@ flowchart LR
 ```
 
 Grading is a cross-encoder rather than the chat model: it scores question and passage
-*jointly*, which the retrieval bi-encoder structurally cannot, in one batched CPU call
+_jointly_, which the retrieval bi-encoder structurally cannot, in one batched CPU call
 instead of twenty generations. The chat model only routes, rewrites, and writes. Without
 `OLLAMA_MODEL` the graph is retrieve+grade and the caller (Claude, via MCP) writes the answer.
 

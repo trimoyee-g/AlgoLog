@@ -31,28 +31,12 @@ from app.services.llm import chat_model, has_llm
 
 log = logging.getLogger(__name__)
 
-# Tunables. RETRIEVE_K is deliberately far above KEEP_K: grading can throw a
-# passage away but can't invent one the search never returned.
 RETRIEVE_K = 20
 KEEP_K = 5
 ENOUGH = 3          # kept passages that count as a complete answer
 MAX_ROUNDS = 2      # query rewrites before falling back to the web
 MAX_WEB_RESULTS = 5
 
-# Cross-encoder floor. Measured on ms-marco-MiniLM-L-6-v2 with chunk-length text:
-#
-#   relevant     +6.2 and -7.7      irrelevant   -11.1, -11.3
-#   marginal     -10.0              (off-topic but same domain)
-#
-# So the scale is not centred on zero — a floor of 0 discards good passages and
-# sends every query to the web fallback. What the model gets reliably right is the
-# *ordering*; the absolute value mostly separates the junk cluster near -11 from
-# everything else, which is all this floor is asked to do. KEEP_K does the rest.
-#
-# ponytail: one absolute floor, no relative-margin rule — revisit if real uploads
-# show good passages landing under it. It assumes chunk-length input: on very
-# short strings the scale collapses ("memoize the recursion" scores -11.1, same as
-# an unrelated recipe), which is why documents.MIN_CHUNK_CHARS exists.
 MIN_SCORE = -10.0
 
 
