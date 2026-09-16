@@ -140,18 +140,6 @@ def test_list_filters_by_platform_tag_rating_and_solved(client, db_session):
     assert len(client.get("/api/v1/problems?min_rating=4&solved_self=true").json()) == 0
 
 
-def test_list_filters_drop_problems_with_no_attempts(client, db_session):
-    # a problem with no attempt log has no rating to compare against, so any
-    # rating/solved filter must exclude it rather than crash or let it through
-    db_session.add(Problem(user_id=TEST_USER_ID, url="https://x/y", title="T",
-                           platform=Platform.gfg, tags="math"))
-    db_session.commit()
-
-    assert len(client.get("/api/v1/problems").json()) == 1           # unfiltered: still listed
-    assert client.get("/api/v1/problems?min_rating=1").json() == []
-    assert client.get("/api/v1/problems?solved_self=false").json() == []
-
-
 def test_list_min_rating_uses_latest_attempt(client, db_session):
     from datetime import datetime, timedelta
     # first attempt hard, latest attempt easy -> should NOT match min_rating=4

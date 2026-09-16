@@ -36,8 +36,6 @@ def list_problems(
         return problems
 
     def latest_matches(p: Problem) -> bool:
-        if not p.attempts:
-            return False
         latest = max(p.attempts, key=lambda a: a.created_at)
         if min_rating is not None and latest.rating < min_rating:
             return False

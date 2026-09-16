@@ -53,8 +53,7 @@ def log_attempt(payload: AttemptCreate, db: Session = Depends(get_db),
 @router.patch("/problems/{problem_id}", response_model=ProblemOut)
 def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depends(get_db),
                    user_id: str = Depends(require_user)):
-    """Edit a problem's fields. rating/solved_self update the latest attempt
-    (or create one if the problem has none yet)."""
+    """Edit a problem's fields. rating/solved_self update the latest attempt."""
     # Embedded before the lock so no model inference runs while the row is held.
     embedding = embed_text(payload.tags) if payload.tags is not None else None
 
@@ -78,10 +77,7 @@ def update_problem(problem_id: int, payload: ProblemUpdate, db: Session = Depend
         problem.embedding = embedding
 
     if payload.rating is not None or payload.solved_self is not None:
-        latest = max(problem.attempts, key=lambda a: a.created_at) if problem.attempts else None
-        if latest is None:
-            latest = Attempt(user_id=user_id, problem_id=problem.id, rating=3, solved_self=False)
-            db.add(latest)
+        latest = max(problem.attempts, key=lambda a: a.created_at)
         if payload.rating is not None:
             latest.rating = payload.rating
         if payload.solved_self is not None:
