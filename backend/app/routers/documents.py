@@ -12,24 +12,15 @@ from app.services.documents import ExtractionError, ingest_pdf, list_documents
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
-_CHUNK = 1024 * 1024
-
-
 async def _read_capped(file: UploadFile) -> bytes:
-    """Read the upload, refusing anything over the cap.
-
-    Streamed rather than `await file.read()`: the point of a size limit is to not
-    have the whole file in memory before deciding it's too big.
-    """
+    """Read the upload, refusing anything over the cap. One byte over is enough to know."""
     cap = settings.MAX_UPLOAD_MB * 1024 * 1024
-    buf = bytearray()
-    while chunk := await file.read(_CHUNK):
-        buf.extend(chunk)
-        if len(buf) > cap:
-            raise HTTPException(413, f"File exceeds the {settings.MAX_UPLOAD_MB}MB limit")
-    if not buf:
+    data = await file.read(cap + 1)
+    if len(data) > cap:
+        raise HTTPException(413, f"File exceeds the {settings.MAX_UPLOAD_MB}MB limit")
+    if not data:
         raise HTTPException(400, "Empty upload")
-    return bytes(buf)
+    return data
 
 
 @router.post("", response_model=DocumentOut, status_code=201)

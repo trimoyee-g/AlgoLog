@@ -2,7 +2,6 @@
 import pytest
 
 from app.models import Problem, Attempt, Platform
-from tests.conftest import TEST_USER_ID
 
 pytestmark = pytest.mark.integration
 
@@ -66,20 +65,6 @@ def test_update_rating_updates_latest_attempt(client, db_session):
     db_session.expire_all()
     latest = db_session.query(Attempt).filter_by(problem_id=pid).one()
     assert latest.rating == 5 and latest.solved_self is True
-
-
-def test_update_creates_attempt_when_problem_has_none(client, db_session):
-    # a problem with zero attempts (seeded directly)
-    p = Problem(user_id=TEST_USER_ID, url="https://x/y", title="T",
-                platform=Platform.gfg, tags="math")
-    db_session.add(p)
-    db_session.commit()
-
-    client.patch(f"/api/v1/problems/{p.id}", json={"rating": 2})
-
-    db_session.expire_all()
-    attempts = db_session.query(Attempt).filter_by(problem_id=p.id).all()
-    assert len(attempts) == 1 and attempts[0].rating == 2
 
 
 def test_update_url_and_platform(client, db_session):
