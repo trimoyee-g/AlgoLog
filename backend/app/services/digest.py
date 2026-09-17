@@ -73,6 +73,9 @@ def render_digest(stats: dict, due: list[dict], note: str) -> str:
     if stats["by_tag"]:
         top = sorted(stats["by_tag"].items(), key=lambda kv: -kv[1])[:5]
         lines.append("Topics: " + ", ".join(f"{t} ({n})" for t, n in top))
+    if stats["by_platform"]:
+        plats = sorted(stats["by_platform"].items(), key=lambda kv: -kv[1])
+        lines.append("Platforms: " + ", ".join(f"{p} ({n})" for p, n in plats))
     lines += ["", "--- Due for review (SM-2) ---"]
     if due:
         for d in due:
@@ -155,15 +158,27 @@ def run_weekly_digest(db: Session) -> dict:
             skipped += 1  # another replica already sent this user's digest
             continue
         try:
-            results.append({"user_id": user_id, **run_weekly_digest_for_user(db, user_id)})
+            digest = build_digest_for_user(db, user_id)
         except Exception:
-            # One bad address must not starve every user after it in the loop.
-            # Roll back whatever the failure left half-done, then drop the claim
+            # Failed before any send was attempted — safe to drop the claim
             # so a rerun this week retries this user.
             failed += 1
-            log.exception("weekly digest failed for user %s", user_id)
+            log.exception("weekly digest build failed for user %s", user_id)
             db.rollback()
             db.query(DigestSend).filter_by(user_id=user_id, week=week).delete()
             db.commit()
+            continue
+        try:
+            body = digest.pop("body")
+            user = db.get(User, user_id)
+            send_email(user.email if user else "", "Your weekly DSA progress digest", body)
+        except Exception:
+            # Unknown whether the email actually went out (SMTP ack can be lost
+            # after a successful send) — keep the claim so a retry never risks
+            # a duplicate. This user's digest is simply missed this week.
+            failed += 1
+            log.exception("weekly digest send failed for user %s (claim kept, not retried)", user_id)
+            continue
+        results.append({"user_id": user_id, **digest})
 
     return {"sent": len(results), "skipped": skipped, "failed": failed, "results": results}
