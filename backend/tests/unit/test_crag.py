@@ -140,6 +140,41 @@ def test_empty_corpus_falls_back_to_web(monkeypatch, scripted, llm, ollama):
     assert any("web fallback" in t for t in out["trace"])
 
 
+def test_web_results_are_graded_and_ranked(monkeypatch, scripted, llm, ollama):
+    """Regression: web hits used to skip the cross-encoder entirely and could
+    outrank well-graded passages just by coming first from DDG."""
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.1")
+    scripted["batches"] = []
+
+    hits = [
+        {"title": "off-topic", "href": "https://x/a", "body": "worst"},
+        {"title": "on-topic", "href": "https://x/b", "body": "best"},
+    ]
+    monkeypatch.setattr("ddgs.DDGS", lambda: type("D", (), {"text": lambda s, q, max_results: hits})())
+    monkeypatch.setattr(crag, "rerank", lambda q, ps: [-9.9 if p == "worst" else 6.2 for p in ps])
+
+    out = crag.ask(None, "u1", "how do I get better at dp?")
+
+    assert [w["url"] for w in out["web"]] == ["https://x/b", "https://x/a"]
+
+
+def test_web_fallback_error_is_distinguished_from_empty_results(monkeypatch, scripted, llm, ollama):
+    """Regression: a DDG exception and a legitimate zero-result search used to
+    produce the identical 'web fallback: 0 results' trace entry."""
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.1")
+    scripted["batches"] = []
+
+    def _boom():
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr("ddgs.DDGS", _boom)
+
+    out = crag.ask(None, "u1", "how do I get better at dp?")
+
+    assert out["web"] == []
+    assert any("web fallback: errored" in t for t in out["trace"])
+
+
 def test_no_llm_returns_passages_without_generating(monkeypatch, scripted, llm):
     """The MCP path: no local model, so the loop is retrieve+grade and Claude writes."""
     monkeypatch.setattr(settings, "OLLAMA_MODEL", "")

@@ -37,7 +37,7 @@ ENOUGH = 3          # kept passages that count as a complete answer
 MAX_ROUNDS = 2      # query rewrites before falling back to the web
 MAX_WEB_RESULTS = 5
 
-MIN_SCORE = -10.0
+MIN_SCORE = -10.0   # tuned for ms-marco cross-encoder logits, which sit well below 0 for good hits
 
 
 class CragState(TypedDict, total=False):
@@ -129,9 +129,12 @@ def _web(state: CragState) -> dict:
         results = DDGS().text(state["question"], max_results=MAX_WEB_RESULTS)
         web = [{"title": r.get("title", ""), "url": r.get("href", ""),
                 "text": r.get("body", "")} for r in results if r.get("href")]
+        if web:
+            scores = rerank(state["question"], [w["text"] for w in web])
+            web = [w for _, w in sorted(zip(scores, web), key=lambda p: p[0], reverse=True)]
     except Exception:
         log.exception("crag: web fallback failed")
-        web = []
+        return {"web": [], "trace": state.get("trace", []) + ["web fallback: errored"]}
     return {"web": web, "trace": state.get("trace", []) + [f"web fallback: {len(web)} results"]}
 
 
