@@ -1,0 +1,202 @@
+[
+  {
+    "question": "What does \"Meet in the Middle\" algorithm do with the input size of \\(2^n\\) and how does it reduce the time complexity?",
+    "gold_chunk_id": 80,
+    "gold_text": "Memory is usually the binding constraint before time is. At n = 22, a table of 2^n by n\n64-bit values is already several gigabytes, so these solutions typically store 32-bit values,\ndrop the second dimension where the problem allows, or iterate masks in increasing order so\nolder layers can be discarded.\n\n## Meet in the Middle\n\nMeet in the middle splits the input in half, enumerates each half exhaustively, and combines\nthe two result sets, turning O(2^n) into roughly O(2^(n/2) \u00b7 n). The combination step is\nwhere the log factor enters, since one half is sorted and the other binary searches it. It\napplies when the objective decomposes additively over the two halves."
+  },
+  {
+    "question": "What is the time complexity of the Hungarian algorithm for solving the assignment problem?",
+    "gold_chunk_id": 108,
+    "gold_text": "Hall's theorem gives the condition for a perfect matching on one side: every subset of that\nside must have a neighbourhood at least as large as itself. It is rarely the algorithm but\noften the proof that a construction works, and its failure exposes exactly which subset is\nover-subscribed.\n\nThe assignment problem adds weights and asks for the minimum-cost perfect matching, solved by\nthe Hungarian algorithm in O(n\u00b3) or by min-cost max-flow. For small n a bitmask DP over one\nside is simpler to write and fast enough, which is worth remembering when n is under twenty.\n\n## Game Theory"
+  },
+  {
+    "question": "What value should be returned if a node's range partially overlaps with the queried interval but lies entirely outside both child nodes?",
+    "gold_chunk_id": 65,
+    "gold_text": "A range query decomposes the queried interval into O(log n) canonical nodes. The recursion\nhas three cases at each node: the node's range lies entirely outside the query, in which\ncase return the operation's identity element; it lies entirely inside, in which case return\nthe stored value; or it partially overlaps, in which case recurse into both children and\nmerge. Getting the identity wrong is a classic bug \u2014 zero for sum, positive infinity for\nmin, and negative infinity for max. Returning zero for a min query makes every answer\nnon-positive and looks correct on arrays that happen to contain a zero."
+  },
+  {
+    "question": "What data structure allows for deletion while maintaining its space efficiency?",
+    "gold_chunk_id": 75,
+    "gold_text": "Deletion is impossible because clearing a bit could unset a position shared with another\nelement, introducing a false negative and destroying the one guarantee the structure offers.\nA counting Bloom filter replaces each bit with a small counter to allow deletion, at four or\nmore times the space. A cuckoo filter supports deletion at a comparable footprint and is\ngenerally the better modern choice.\n\nBloom filters appear in front of on-disk lookups in log-structured merge trees, in web\ncaches deciding whether to bother with a network round trip, and in deduplication pipelines\nwhere a small false-positive rate merely means occasionally skipping a genuinely new item.\nThat last case is worth noting: the failure mode is not always harmless, and the acceptable\nrate depends entirely on what the caller does with a \"possibly\".\n\n## Tree Dynamic Programming"
+  },
+  {
+    "question": "What prevents the Compare-and-Swap (CAS) operation from failing due to the ABA problem?",
+    "gold_chunk_id": 112,
+    "gold_text": "Optimistic concurrency assumes conflicts are rare: read a value with a version, compute, and\ncommit only if the version is unchanged, retrying otherwise. Compare-and-swap is the hardware\nprimitive underneath, and it is what lock-free structures are built from. The ABA problem \u2014 a\nvalue changing away and back between the read and the swap \u2014 is why real implementations tag\npointers with a counter.\n\nAmdahl's law bounds the speedup from parallelism by the serial fraction of the work: if a\ntwentieth of the program is inherently sequential, no number of cores exceeds a twentyfold\nspeedup. It is the reason that reducing contention usually beats adding threads, and the\nreason that a profile should precede a parallelisation.\n\n## Systems Notes for Interviews"
+  },
+  {
+    "question": "What condition must be broken to prevent a deadlock?",
+    "gold_chunk_id": 111,
+    "gold_text": "## Concurrency Fundamentals\n\nA race condition exists when the result depends on the unsynchronised interleaving of threads.\nThe canonical example is a read-modify-write of a shared counter, which is three machine\noperations and can lose updates when two threads interleave between the read and the write.\nAn atomic increment or a lock around the sequence removes the window.\n\nA deadlock requires four conditions simultaneously: mutual exclusion, hold and wait, no\npreemption, and circular wait. Breaking any one prevents it, and the practical technique is\nbreaking circular wait by imposing a global order on lock acquisition. Livelock is the related\nfailure where threads keep changing state in response to each other and none progresses."
+  },
+  {
+    "question": "What is the time complexity of finding the Lowest Common Ancestor (LCA) in a Binary Search Tree (BST)?",
+    "gold_chunk_id": 52,
+    "gold_text": "## Trees and Traversals\n\nInorder traversal of a binary search tree yields sorted order, which is the property behind\nmost BST validation and k-th element problems. Validating a BST by comparing each node only\nto its immediate children is wrong: the constraint is over the whole subtree, so the check\nmust thread a (min, max) range downward, or equivalently confirm the inorder sequence is\nstrictly increasing.\n\nThe lowest common ancestor of two nodes in a BST is found by walking from the root while both\ntargets lie on the same side; the first node that splits them is the LCA, in O(h). In a general\nbinary tree there is no ordering to exploit, so the standard approach recurses and returns the\nnode where the two targets are found in different subtrees."
+  },
+  {
+    "question": "What are the two values returned by each node in the maximum weight independent set problem?",
+    "gold_chunk_id": 76,
+    "gold_text": "## Tree Dynamic Programming\n\nDP on trees computes a value per node from the values of its children, which makes a single\npost-order DFS enough \u2014 no explicit ordering step is needed because recursion already visits\nchildren first. The classic example is the maximum weight independent set: each node returns\ntwo values, the best total including itself and the best excluding itself, and the parent\ncombines them. Including a node forbids including its children; excluding it permits either."
+  },
+  {
+    "question": "What is the time complexity of updating a persistent data structure using the path-copying technique?",
+    "gold_chunk_id": 84,
+    "gold_text": "Mo's algorithm is inherently offline: every query must be known before any is answered.\nProblems with updates interleaved between queries need the three-dimensional variant, which\nadds a time coordinate and degrades to O(n^(5/3)), or a different structure entirely.\n\n## Persistent Data Structures\n\nA persistent data structure preserves every version of itself across updates, so an old\nversion remains queryable after a modification. The path-copying technique makes any balanced\ntree persistent: an update rewrites only the nodes along the root-to-leaf path and shares\nevery untouched subtree with the previous version, costing O(log n) new nodes per update\nrather than a full copy."
+  },
+  {
+    "question": "What is the formula for finding the reverse edge index in a bipartite graph's residual array?",
+    "gold_chunk_id": 106,
+    "gold_text": "Residual edges are the part that is easy to get wrong. Every edge needs a reverse edge with\ncapacity zero, and pushing flow forward must decrease the forward capacity and increase the\nreverse one. Storing edges in a flat array with paired indices lets the reverse of edge i be\nedge i xor 1, which is compact and removes a whole class of bookkeeping error.\n\nMinimum cut is recovered after the flow saturates by finding the vertices still reachable from\nthe source in the residual graph; the cut edges are those crossing from that reachable set to\nits complement. Project selection, image segmentation, and various \"choose one of two labels\nwith pairwise penalties\" problems are all this construction.\n\n## Bipartite Matching"
+  },
+  {
+    "question": "What specific algorithm does a binary trie over the bits of integers solve?",
+    "gold_chunk_id": 73,
+    "gold_text": "A compressed trie, or radix tree, merges chains of single-child nodes into one edge labelled\nwith a substring. This cuts both memory and traversal depth on realistic dictionaries, at the\ncost of splitting an edge when a new insertion diverges in its middle. Suffix trees are radix\ntries over all suffixes of a string and support substring queries in time linear in the\nquery, though the suffix automaton or suffix array is usually preferred in practice for being\nfar less painful to implement.\n\nThe binary trie over the bits of integers solves maximum-XOR-pair problems. Insert every\nnumber as a 32-step path, then for each number walk the trie greedily preferring the opposite\nbit at each level, since a differing high bit outweighs every lower bit combined. That greedy\ndescent is correct precisely because place value dominates.\n\n## Bloom Filters"
+  },
+  {
+    "question": "What is the time complexity of radix sort when sorting strings based on their lengths?",
+    "gold_chunk_id": 56,
+    "gold_text": "Counting sort and radix sort beat the O(n log n) comparison lower bound by not comparing.\nCounting sort is O(n + k) for integer keys in a range of size k, which is only useful when k is\nnot much larger than n. Radix sort applies counting sort digit by digit, least significant\nfirst, and depends on that inner sort being stable.\n\n## Strings\n\nKMP matches a pattern in O(n + m) by precomputing a failure function \u2014 for each prefix, the\nlength of the longest proper prefix that is also a suffix. On a mismatch, instead of restarting,\nthe pattern shifts so that the already-matched prefix aligns. The failure table is itself built\nby running the pattern against itself."
+  },
+  {
+    "question": "What data structures are used to maintain the order of nodes in an LRU cache?",
+    "gold_chunk_id": 69,
+    "gold_text": "## LRU and LFU Caches\n\nAn LRU cache evicts the least recently used entry when it exceeds capacity, and needs O(1)\nfor both get and put. The standard construction pairs a hash map from key to node with a\ndoubly linked list ordered by recency. The map gives constant-time lookup; the list gives\nconstant-time reordering, because a node can be unlinked and re-inserted at the head without\nscanning. A singly linked list fails here \u2014 unlinking needs the predecessor.\n\nSentinel head and tail nodes remove every null check from the pointer surgery. Without them\neach unlink has to special-case the first and last positions, which is where the bugs live.\nIn Python, `collections.OrderedDict` already implements exactly this, with `move_to_end` and\n`popitem(last=False)`, so writing the linked list by hand is only worth it in an interview\nthat asks for it explicitly."
+  },
+  {
+    "question": "What is the time complexity of Bellman-Ford when checking for negative cycles?",
+    "gold_chunk_id": 47,
+    "gold_text": "## Shortest Paths\n\nDijkstra's algorithm finds single-source shortest paths in a graph with non-negative edge\nweights, in O((V + E) log V) with a binary heap. It is greedy: once a node is popped from the\nheap its distance is final. That guarantee is exactly what negative edges break \u2014 a later\nnegative edge could improve a distance already declared final \u2014 so Dijkstra is simply wrong,\nnot merely slow, on negative weights.\n\nBellman-Ford handles negative edges by relaxing every edge V-1 times, in O(VE). A V-th pass\nthat still improves a distance proves a negative cycle is reachable, which is the standard way\nto detect one. Its slowness buys correctness on graphs Dijkstra cannot handle at all."
+  },
+  {
+    "question": "What specific algorithm does virtual nodes smooth out in consistent hashing?",
+    "gold_chunk_id": 113,
+    "gold_text": "## Systems Notes for Interviews\n\nConsistent hashing maps both keys and servers onto a ring so that adding or removing a server\nrelocates only the keys in one arc rather than remapping everything, which plain modulo\nhashing would do. Virtual nodes \u2014 many ring positions per physical server \u2014 smooth the load\nimbalance that a small number of servers otherwise produces.\n\nA log-structured merge tree buffers writes in memory and flushes them as sorted immutable\nfiles, merging those files in the background. Writes are sequential and therefore fast, while\nreads may consult several files and so are guarded by Bloom filters per file. This is the\ninverse trade of a B-tree, which optimises reads and pays on random writes, and it is why\nLSM-based stores dominate write-heavy workloads."
+  },
+  {
+    "question": "What is the time complexity of the doubling construction method for building a suffix array?",
+    "gold_chunk_id": 95,
+    "gold_text": "## Suffix Arrays\n\nA suffix array lists the starting indices of all suffixes of a string in lexicographic order.\nBuilt naively by sorting the suffixes it costs O(n\u00b2 log n); the doubling construction sorts by\nthe first two characters, then four, then eight, using the previous ranks as sort keys, and\nreaches O(n log\u00b2 n) with a comparison sort or O(n log n) with radix sort. The linear-time\nconstructions exist but are rarely worth the implementation risk."
+  },
+  {
+    "question": "What is the time complexity of marking composites in the linear sieve algorithm?",
+    "gold_chunk_id": 101,
+    "gold_text": "## Number Theory\n\nThe sieve of Eratosthenes marks composites in O(n log log n) by starting each prime's marking\nat its square, since smaller multiples already carry a smaller factor. A linear sieve does the\nsame in O(n) by ensuring every composite is marked exactly once, by its smallest prime factor,\nand it produces that smallest-factor table as a by-product \u2014 which is what makes factorising\nmany numbers up to n fast afterwards.\n\nThe extended Euclidean algorithm computes the greatest common divisor along with coefficients\nsatisfying Bezout's identity, which gives modular inverses when the modulus is coprime to the\nvalue. When the modulus is prime, Fermat's little theorem offers the shorter route: the\ninverse is the value raised to the modulus minus two, computed by fast exponentiation."
+  },
+  {
+    "question": "What specific algorithm or structure does Sprague-Grundy theory cover?",
+    "gold_chunk_id": 110,
+    "gold_text": "Misere play, where the player unable to move wins, is not covered by Sprague-Grundy in general.\nMisere Nim happens to have a simple characterisation involving heaps of size one, but the\ngeneral misere theory is far harder, and assuming the normal-play analysis transfers is a\nreliable way to get a wrong answer.\n\nPartisan games, where the two players have different available moves, fall outside Grundy\ntheory entirely and need combinatorial game theory's surreal-number machinery. Most contest\nproblems are impartial, and the tell is that the rules never mention which player is moving.\n\n## Concurrency Fundamentals"
+  },
+  {
+    "question": "What condition determines whether an edge into a grey node represents a cycle in a directed graph?",
+    "gold_chunk_id": 46,
+    "gold_text": "Cycle detection differs by graph type. In an undirected graph, a cycle exists if DFS reaches\nan already-visited node that is not the immediate parent. In a directed graph the parent test\nis wrong; you need three colours \u2014 white unvisited, grey on the current recursion stack, black\nfully finished \u2014 and a cycle is an edge into a grey node. An edge into a black node is a cross\nor forward edge and is harmless.\n\nTopological sort orders a directed acyclic graph so every edge points forward. Kahn's\nalgorithm repeatedly removes nodes of in-degree zero; if fewer than V nodes come out, the\ngraph has a cycle. The DFS variant pushes each node onto a stack after its descendants finish\nand reverses the result.\n\n## Shortest Paths"
+  },
+  {
+    "question": "What is the expected depth of a treap's shape in terms of n?",
+    "gold_chunk_id": 87,
+    "gold_text": "A treap combines a binary search tree over keys with a heap over randomly assigned\npriorities. Because the priorities are random, the tree's shape is that of a randomly built\nBST, whose expected depth is about 1.39 log n. Insertion places a node by key then rotates it\nup until the heap property holds, and deletion rotates it down to a leaf and removes it.\n\nRandomised structures give expected bounds, not worst-case ones, but the expectation is over\nthe structure's own coin flips rather than over the input. That distinction matters: an\nadversary who chooses the input cannot force bad behaviour, unlike deterministic quicksort\nwith a fixed pivot rule, where a crafted input reliably triggers the quadratic case."
+  },
+  {
+    "question": "What does it mean if an algorithm's actual time complexity is \u0398(n) but it's described as O(n\u00b2)?",
+    "gold_chunk_id": 59,
+    "gold_text": "Shifting by more than the width of the type is undefined behaviour in C and C++, and in Python\n`1 << 64` is simply a large integer because integers are arbitrary precision. Porting bit tricks\nbetween the two therefore needs explicit masking to reproduce fixed-width wraparound.\n\n## Complexity Analysis\n\nBig-O is an upper bound, Big-Omega a lower bound, and Big-Theta a tight bound. Saying an\nalgorithm is O(n\u00b2) when it is really \u0398(n) is technically true and practically misleading, which\nis why \"tight bound\" is usually what an interviewer means when they ask for the complexity."
+  },
+  {
+    "question": "What specific algorithm does reservoir sampling pick k items from a stream of unknown length, and what is the probability at which it replaces an incumbent?",
+    "gold_chunk_id": 88,
+    "gold_text": "Reservoir sampling picks k items uniformly from a stream of unknown length in O(1) space per\nitem. Keep the first k, then for the i-th item accept it with probability k/i, replacing a\nuniformly chosen incumbent. The induction proving uniformity is short and is worth being able\nto reproduce, because the algorithm looks like it should be biased toward early items and is\nnot.\n\n## Matrix Exponentiation\n\nAny linear recurrence can be written as a matrix acting on a state vector, and the n-th term\nthen follows from the matrix raised to the n-th power. Fibonacci becomes a two-by-two matrix,\nand exponentiation by squaring computes the power in O(log n) multiplications, giving O(log n)\noverall instead of the O(n) of iteration. For a k-term recurrence the matrix is k by k and the\ncost is O(k\u00b3 log n)."
+  },
+  {
+    "question": "What is the maximum total pointer movement bound by Mo's algorithm?",
+    "gold_chunk_id": 83,
+    "gold_text": "Mo's algorithm reorders offline range queries so that a moving window can be adjusted\nincrementally instead of recomputed. Sorting queries by block of the left endpoint, then by\nright endpoint, bounds the total pointer movement at O((n + q)\u00b7sqrt n). It requires that the\nanswer be maintainable under adding or removing a single element at either end, which rules\nout anything needing the whole range at once.\n\nThe odd-even optimisation sorts the right endpoint ascending in even-numbered blocks and\ndescending in odd ones, which roughly halves the constant by avoiding the long sweep back at\neach block boundary. It is a two-line change and worth applying by default."
+  },
+  {
+    "question": "What does Manacher's algorithm do with even-length and odd-length palindromes?",
+    "gold_chunk_id": 94,
+    "gold_text": "Manacher's algorithm finds all palindromic substrings in linear time by the same mirroring\nidea applied to palindrome radii. The standard trick inserts a separator between every pair of\ncharacters, so even-length and odd-length palindromes become one case instead of two and the\nimplementation halves in size.\n\nPalindrome problems that seem to need Manacher often do not. Counting distinct palindromic\nsubstrings needs a palindromic tree, checking whether a string can be split into two\npalindromes needs only prefix and suffix radii, and longest palindromic subsequence is an\nentirely different problem solved by LCS against the reversed string.\n\n## Suffix Arrays"
+  },
+  {
+    "question": "What are the key steps to identify and design a suitable state tuple for solving the Knapsack problem?",
+    "gold_chunk_id": 41,
+    "gold_text": "The reliable route is recursion first, memoisation second, table third. Write the brute\nforce recursion without thinking about efficiency. Identify the parameters that actually\nvary \u2014 that tuple is your state. Add a cache keyed on the state. Only then, if you need the\nconstant factor or the space saving, convert to a bottom-up table.\n\nState design is the whole difficulty. Too few parameters and the recurrence is wrong; too\nmany and the table explodes. A useful test: if you handed a colleague only the state tuple,\ncould they finish the problem without seeing the rest of the input history? If not, the\nstate is missing something. The number of distinct states multiplied by the work per state\nis the complexity, which makes the cost obvious before you write any code.\n\n## Knapsack Variants"
+  },
+  {
+    "question": "What condition must be met for the merge operation in a Fenwick Tree?",
+    "gold_chunk_id": 66,
+    "gold_text": "Lazy propagation extends the structure to range updates. Instead of pushing an update down\nto every leaf, a node records a pending modification and applies it to its children only\nwhen a later query forces a visit. The pending value must be pushed down before any\nrecursion into children, and the node's own stored value must be corrected immediately.\nRange assignment and range addition compose differently, and mixing both in one tree\nrequires deciding an order \u2014 assignment must clear any pending addition, never the reverse.\n\nThe merge operation must be associative but need not be commutative, which matters for\nthings like matrix products or \"leftmost element satisfying a predicate\". It need not be\ninvertible either, which is exactly the advantage over prefix sums: min has no inverse, so\nprefix arrays cannot answer range minimum, while a segment tree can.\n\n## Fenwick Trees"
+  },
+  {
+    "question": "What does `sub = (sub - 1) & mask` do in the context of iterating through submasks of a given mask?",
+    "gold_chunk_id": 79,
+    "gold_text": "Assignment problems fit the same mould. Matching n workers to n tasks with a cost matrix\nbecomes `dp[mask]`, the cheapest way to assign the first popcount(mask) workers to the task\nset mask. The number of assigned workers is implied by the mask's population count, which\nremoves a dimension from the state and is the standard trick for keeping these tables small.\n\nIterating submasks of a mask uses `sub = (sub - 1) & mask`, starting from mask itself and\nstopping after zero. Summed over all masks this visits 3^n states, because each element is\nindependently in the submask, in the mask but not the submask, or in neither. Set-partition\nDP relies on this and is therefore feasible only for quite small n."
+  },
+  {
+    "question": "What condition must be met to ensure the termination of a binary search algorithm when using a while loop with two pointers, specifically ensuring that the interval does not remain unchanged?",
+    "gold_chunk_id": 36,
+    "gold_text": "Binary search generalises far beyond sorted arrays. Any monotone predicate over a range\nadmits it: if `f(x)` is false for all x below some threshold and true for all x above, you\ncan binary search for the threshold. This is \"binary search on the answer\" and it turns a\nsurprising number of optimisation problems into search problems. Classic examples are\nminimising the maximum load when splitting an array into k subarrays, and finding the\nsmallest ship capacity to ship packages within d days.\n\nThe termination argument matters. Each iteration strictly shrinks `hi - lo`, so the loop\nmust end. If you write a branch that can leave the interval unchanged \u2014 for example\n`lo = mid` in a `while lo < hi` loop \u2014 you get an infinite loop on a two-element range.\nThat single mistake accounts for most broken binary searches.\n\n## Two Pointers"
+  },
+  {
+    "question": "What does it mean when the passage mentions keeping prefix and suffix aggregates over a child list in the context of bitmask dynamic programming?",
+    "gold_chunk_id": 78,
+    "gold_text": "The subtlety in rerooting is that the transfer formula must be invertible or the parent must\nmaintain enough aggregate to remove one child's contribution. When the merge is a maximum\nrather than a sum, subtraction does not work, and the standard fix is keeping prefix and\nsuffix aggregates over the child list so any single child can be excluded in constant time.\n\n## Bitmask Dynamic Programming\n\nBitmask DP encodes a subset of up to about twenty elements as an integer, making the state\nspace 2^n and the transitions bit operations. The travelling salesman problem is the canonical\ninstance: `dp[mask][i]` is the cheapest route visiting exactly the cities in mask and ending\nat i, giving O(2^n \u00b7 n\u00b2) time and O(2^n \u00b7 n) memory. That is exponential but tractable to\nroughly n = 20, which is far better than the n! of brute force."
+  },
+  {
+    "question": "What changes are made in the recurrence relation for the unbounded knapsack compared to the 0/1 knapsack?",
+    "gold_chunk_id": 42,
+    "gold_text": "## Knapsack Variants\n\nThe 0/1 knapsack gives each item a weight and a value; you may take each item at most once,\nand you maximise value subject to a capacity. The recurrence is\n`dp[i][w] = max(dp[i-1][w], dp[i-1][w - wt[i]] + val[i])`, running in O(n\u00b7W) time. This is\npseudo-polynomial, not polynomial: W is a value, not an input length, so the cost grows\nexponentially in the number of bits of W.\n\nUnbounded knapsack allows unlimited copies of each item. The only change is that the second\nterm reads from the current row rather than the previous one: `dp[i][w-wt[i]]` instead of\n`dp[i-1][w-wt[i]]`, because taking an item leaves it available. Coin change is unbounded\nknapsack with all values equal to one and a minimisation objective."
+  },
+  {
+    "question": "What is the optimal number of hash functions needed for a Bloom filter with \\( m \\) bits and \\( n \\) elements?",
+    "gold_chunk_id": 74,
+    "gold_text": "## Bloom Filters\n\nA Bloom filter is a probabilistic set that answers membership with no false negatives and a\ntunable rate of false positives, in a bit array far smaller than the elements themselves. It\nsupports insert and query but not deletion, and it cannot enumerate what it contains.\n\nInsertion sets the bits at k independent hash positions. A query returns \"possibly present\"\nonly if all k bits are set, and \"definitely absent\" otherwise. The asymmetry is the whole\npoint: a definite negative is trustworthy, so the filter is a cheap gate in front of an\nexpensive lookup. The optimal number of hashes for m bits and n elements is\n(m/n)\u00b7ln 2, giving a false positive rate of roughly 0.6185 raised to the power m/n."
+  },
+  {
+    "question": "What condition must residues satisfy in the non-coprime generalization of the Chinese remainder theorem?",
+    "gold_chunk_id": 102,
+    "gold_text": "The Chinese remainder theorem reconstructs a number from its residues modulo pairwise coprime\nmoduli, and is what allows a computation to be split across several small primes and\nrecombined. Its constructive proof is the algorithm, and the non-coprime generalisation\nrequires the residues to agree on every shared factor or no solution exists.\n\nModular arithmetic pitfalls are mundane and costly. Subtraction can go negative, so add the\nmodulus before reducing. Division is not defined without an inverse, so a formula with a\ndenominator needs the modulus to be prime or the denominator to be coprime to it. And a\nproduct of two values near the modulus overflows 32-bit arithmetic well before the modulus\nitself does.\n\n## Combinatorics"
+  },
+  {
+    "question": "What position is losing for the player to move exactly when its Grundy value is zero?",
+    "gold_chunk_id": 109,
+    "gold_text": "## Game Theory\n\nAn impartial game under normal play \u2014 the player unable to move loses \u2014 is fully described by\nits Grundy value, the minimum excluded value of the Grundy values of its options. A position\nis losing for the player to move exactly when its Grundy value is zero, and the Sprague-Grundy\ntheorem says a sum of independent games has the XOR of their Grundy values.\n\nNim is the base case: with heaps of sizes given, the position is losing for the mover precisely\nwhen the XOR of all heap sizes is zero. The winning move is always to reduce some heap so that\nthe total XOR becomes zero, and the heap to modify is one whose size has a set bit in the same\nposition as the highest set bit of the current XOR."
+  },
+  {
+    "question": "What is the purpose of using an epsilon when comparing floating point numbers?",
+    "gold_chunk_id": 98,
+    "gold_text": "Segment intersection is decided by checking that each segment's endpoints lie on opposite\nsides of the other, which is four cross products with opposite signs. The collinear case must\nbe handled separately with an overlap test on the bounding boxes, and skipping it is the\nstandard source of wrong answers on degenerate inputs that any real test set includes.\n\nFloating point is the recurring hazard. Whenever coordinates are integers, every one of these\npredicates can be evaluated in exact integer arithmetic, and doing so removes an entire class\nof bug. When floats are unavoidable, comparisons need an epsilon, and the epsilon must scale\nwith the magnitude of the coordinates rather than being a fixed constant like one times ten to\nthe minus ninth."
+  },
+  {
+    "question": "What is the time complexity of enumerating all submasks using the idiom `sub = (sub - 1) & mask`?",
+    "gold_chunk_id": 58,
+    "gold_text": "## Bit Manipulation\n\n`x & (x - 1)` clears the lowest set bit, and repeating it until zero counts set bits in as many\nsteps as there are ones \u2014 Brian Kernighan's algorithm. `x & -x` isolates the lowest set bit,\nwhich is the operation Fenwick trees are built on. `x ^ x` is zero, which is why XOR finds the\nsingle unpaired element in an array where everything else appears twice, in O(1) space.\n\nSubset enumeration over a set of n elements iterates masks from 0 to 2^n - 1, testing bit i to\ndecide membership. Enumerating all submasks of a given mask uses the idiom\n`sub = (sub - 1) & mask`, which visits every submask exactly once and runs in O(3^n) across all\nmasks rather than O(4^n)."
+  },
+  {
+    "question": "What happens if a key's old bucket empties and it was the minimum frequency when accessed? Does the minimum frequency pointer always increment by exactly one in such cases?",
+    "gold_chunk_id": 70,
+    "gold_text": "LFU is harder because eviction is by frequency, with recency breaking ties. The O(1)\nsolution keeps a hash map of frequency to a linked list of keys at that frequency, plus a\npointer to the current minimum frequency. On access, a key moves from its bucket to the\nbucket one higher; if its old bucket empties and it was the minimum, the minimum increments\nby exactly one \u2014 never more, which is the observation that makes constant time possible.\n\nCache eviction policy interacts with workload. LRU degrades badly on a scan larger than the\ncache, evicting everything useful for data touched once; this is why real systems use\nsegmented LRU or admission policies like TinyLFU, which decide whether a newly seen key\ndeserves to displace an established one at all.\n\n## Trie Applications"
+  },
+  {
+    "question": "What condition must be met for A* to guarantee optimality in its search algorithm?",
+    "gold_chunk_id": 48,
+    "gold_text": "Floyd-Warshall computes all-pairs shortest paths in O(V\u00b3) with a triple loop, and the loop\norder matters: the intermediate-node loop k must be outermost. Its invariant is that after\niteration k, `dp[i][j]` is the shortest path using only intermediates from the first k nodes.\nPutting k innermost breaks that invariant and produces wrong answers on some graphs while\nlooking correct on many.\n\nA* is Dijkstra with a heuristic added to the priority. It is guaranteed optimal only when the\nheuristic is admissible \u2014 never overestimating the true remaining distance. Manhattan distance\non a grid with unit costs is admissible; straight-line Euclidean distance is admissible when\nmovement is unrestricted.\n\n## Union-Find"
+  },
+  {
+    "question": "What specific algorithm does the passage describe for computing the diameter of a tree?",
+    "gold_chunk_id": 77,
+    "gold_text": "Tree diameter has an elegant two-value formulation. At each node compute the deepest path\ndownward through each child, keep the two largest, and the diameter passing through this node\nis their sum. The answer is the maximum over all nodes, computed in one pass. The alternative\nfolklore method \u2014 BFS from any node to find the farthest, then BFS again from there \u2014 is\nshorter but only correct on unweighted trees or trees with non-negative weights.\n\nRerooting handles the family of problems asking for an answer at every node, such as the sum\nof distances from each node to all others. Compute the downward answer with one DFS, then a\nsecond DFS pushes information from parent to child, converting the parent's total into the\nchild's by moving the edge between them. Both passes are linear, so the whole thing is O(n)\nrather than the O(n\u00b2) of running the first DFS from every root."
+  },
+  {
+    "question": "What is the time complexity for updating a value at a specific index using a Fenwick tree?",
+    "gold_chunk_id": 68,
+    "gold_text": "Range updates with point queries invert the roles: store a difference array in the Fenwick\ntree, so adding v over [l, r] becomes two point updates, and a point query becomes a prefix\nsum. Supporting range update *and* range query needs two Fenwick trees and a small algebraic\nidentity, which is where a segment tree with lazy propagation usually becomes the more\nreadable choice.\n\nA Fenwick tree can also be built in O(n) rather than O(n log n) by adding each element to\nits immediate parent in one pass, and it supports O(log n) search for the smallest prefix\nwhose sum reaches a target by descending over bit positions. That descent is what makes it\nusable as an order-statistics structure \u2014 finding the k-th smallest element in a dynamic\nmultiset of bounded values.\n\n## LRU and LFU Caches"
+  },
+  {
+    "question": "What is the difference between using a min-heap for the k largest elements and a max-heap for the median-maintenance structure?",
+    "gold_chunk_id": 51,
+    "gold_text": "The top-k pattern uses a heap of size k, which costs O(n log k) rather than the O(n log n) of\na full sort. For the k largest elements, keep a min-heap and pop whenever the size exceeds k,\nso the smallest of the current best k is always the one discarded. Reversing the polarity here\nis a common bug and yields the k smallest instead.\n\nA median-maintenance structure uses two heaps: a max-heap for the lower half and a min-heap\nfor the upper half, rebalanced so their sizes differ by at most one. The median is then a peek\non one or the average of both peeks. Python's heapq is min-only, so a max-heap is built by\nnegating values on push and pop.\n\n## Trees and Traversals"
+  }
+]

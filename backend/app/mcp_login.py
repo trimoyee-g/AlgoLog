@@ -37,11 +37,11 @@ import threading
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-from app import mcp_token_store
+from pathlib import Path
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 CALLBACK_PORT = 8765
+TOKEN_FILE = Path.home() / ".algolog" / "mcp_refresh_token"
 
 _captured: dict = {}
 _done = threading.Event()
@@ -64,9 +64,7 @@ _CALLBACK_HTML = b"""<!doctype html><html><body>
       error: params.get("error_description"),
     }),
   }).then(() => {
-    document.body.innerHTML = params.get("error_description")
-      ? "<p>Sign-in failed - check the terminal.</p>"
-      : "<p>Signed in - you can close this tab.</p>";
+    document.body.innerHTML = "<p>Signed in - you can close this tab.</p>";
   });
 </script>
 </body></html>"""
@@ -128,8 +126,9 @@ def main() -> None:
             "that the redirect URL above is allow-listed in Supabase, then try again."
         )
 
-    mcp_token_store.save(refresh_token)
-    print(f"Saved an MCP-only session to {mcp_token_store.TOKEN_FILE}")
+    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(refresh_token)
+    print(f"Saved an MCP-only session to {TOKEN_FILE}")
     print("This session is independent of your dashboard login: the MCP server will")
     print("refresh it on its own from now on, without touching your browser session")
     print("(or being touched by it). Restart Claude Desktop / Claude Code to pick it up.")
