@@ -65,8 +65,14 @@ class DocumentOut(BaseModel):
         from_attributes = True
 
 
+class AskTurn(BaseModel):
+    question: str
+    answer: str
+
+
 class AskRequest(BaseModel):
     question: str
+    history: List[AskTurn] = []
 
 
 class SimilarProblemOut(BaseModel):
@@ -145,6 +151,7 @@ class PassageOut(BaseModel):
     document_id: int
     document: str
     ordinal: int
+    page: Optional[int] = None
     text: str
     similarity: float
     relevance: Optional[float] = None  # absent if grading was skipped

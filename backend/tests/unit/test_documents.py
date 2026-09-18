@@ -5,6 +5,7 @@ from app.services.documents import (
     CHUNK_SIZE,
     MIN_CHUNK_CHARS,
     ExtractionError,
+    chunk_pages,
     chunk_text,
     extract_pdf_text,
 )
@@ -75,8 +76,11 @@ def test_real_pdf_round_trips_to_chunks():
         c.drawString(50, 800 - i * 20, "Dynamic programming needs a state and a transition.")
     c.save()
 
-    text, pages = extract_pdf_text(buf.getvalue())
-    assert pages == 1
-    assert "Dynamic programming" in text
-    chunks = chunk_text(text)
-    assert chunks and all(len(ch) >= MIN_CHUNK_CHARS for ch in chunks)
+    pages, page_count = extract_pdf_text(buf.getvalue())
+    assert page_count == 1
+    assert pages == [(1, pages[0][1])]
+    assert "Dynamic programming" in pages[0][1]
+
+    chunks = chunk_pages(pages)
+    assert chunks and all(page == 1 for page, _ in chunks)
+    assert all(len(c) >= MIN_CHUNK_CHARS for _, c in chunks)

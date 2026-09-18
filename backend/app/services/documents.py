@@ -27,24 +27,25 @@ class ExtractionError(ValueError):
     """The upload isn't a PDF we can read text out of."""
 
 
-def extract_pdf_text(data: bytes) -> tuple[str, int]:
-    """Return (text, page_count). Raises ExtractionError on unreadable input."""
+def extract_pdf_text(data: bytes) -> tuple[list[tuple[int, str]], int]:
+    """Return (pages, page_count): pages is [(1-indexed page number, text), ...]
+    for pages that have text. Raises ExtractionError on unreadable input."""
     from pypdf import PdfReader
 
     try:
         reader = PdfReader(io.BytesIO(data))
-        pages = [p.extract_text() or "" for p in reader.pages]
+        raw_pages = [p.extract_text() or "" for p in reader.pages]
     except Exception as e:  # noqa: BLE001 — pypdf raises a wide variety
         raise ExtractionError(f"Could not read PDF: {e}") from e
 
-    text = "\n\n".join(p for p in pages if p.strip())
-    if not text.strip():
+    pages = [(i, t) for i, t in enumerate(raw_pages, start=1) if t.strip()]
+    if not pages:
         # A scanned PDF is a pile of images with no text layer. Fail loudly rather
         # than storing a document with zero chunks that silently never retrieves.
         raise ExtractionError(
             "No selectable text found — this looks like a scanned PDF. OCR it first."
         )
-    return text, len(reader.pages)
+    return pages, len(reader.pages)
 
 
 def chunk_text(text: str) -> list[str]:
@@ -59,25 +60,30 @@ def chunk_text(text: str) -> list[str]:
     return [c.strip() for c in splitter.split_text(text) if len(c.strip()) >= MIN_CHUNK_CHARS]
 
 
+def chunk_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Chunk each page independently so every chunk keeps its source page number."""
+    return [(page, c) for page, text in pages for c in chunk_text(text)]
+
+
 def ingest_pdf(db: Session, user_id: str, filename: str, data: bytes) -> Document:
     """Extract, chunk, embed and store an uploaded PDF. Commits."""
-    text, pages = extract_pdf_text(data)
-    chunks = chunk_text(text)
+    pages, page_count = extract_pdf_text(data)
+    chunks = chunk_pages(pages)
     if not chunks:
         raise ExtractionError("PDF produced no usable text chunks.")
 
-    doc = Document(user_id=user_id, filename=filename, pages=pages)
+    doc = Document(user_id=user_id, filename=filename, pages=page_count)
     db.add(doc)
     db.flush()  # assign doc.id without ending the transaction
 
     db.add_all([
-        Chunk(document_id=doc.id, user_id=user_id, ordinal=i,
+        Chunk(document_id=doc.id, user_id=user_id, ordinal=i, page=page,
               text=c, embedding=embed_prose(c))
-        for i, c in enumerate(chunks)
+        for i, (page, c) in enumerate(chunks)
     ])
     db.commit()
     db.refresh(doc)
-    log.info("ingested %s: %d pages, %d chunks", filename, pages, len(chunks))
+    log.info("ingested %s: %d pages, %d chunks", filename, page_count, len(chunks))
     return doc
 
 
@@ -105,6 +111,7 @@ def search_chunks(db: Session, user_id: str, question: str, k: int) -> list[dict
             "document_id": c.document_id,
             "document": filename,
             "ordinal": c.ordinal,
+            "page": c.page,
             "text": c.text,
             "similarity": round(1 - float(d), 3) if d is not None else 0.0,
         }

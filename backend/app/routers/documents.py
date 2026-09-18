@@ -70,4 +70,5 @@ def ask_documents(payload: AskRequest, db: Session = Depends(get_db),
     local LLM is configured — the graded passages still come back, which is what
     the MCP tool wants anyway.
     """
-    return crag.ask(db, user_id, payload.question)
+    history = [t.model_dump() for t in payload.history]
+    return crag.ask(db, user_id, payload.question, history)

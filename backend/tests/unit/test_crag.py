@@ -99,6 +99,34 @@ def test_route_never_rewrites_once_budget_is_spent():
 
 # --- the graph -----------------------------------------------------------
 
+def test_history_is_included_in_the_generation_prompt(monkeypatch, scripted, llm):
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.1")
+    scripted["batches"] = [[_chunk(i, f"passage {i}") for i in range(ENOUGH)]]
+    seen = {}
+
+    import langchain_ollama
+
+    class _Msg:
+        content = "ok"
+
+    class _Chat:
+        def __init__(self, **kwargs):
+            pass
+
+        def invoke(self, prompt):
+            seen["prompt"] = prompt
+            return _Msg()
+
+    monkeypatch.setattr(langchain_ollama, "ChatOllama", _Chat)
+
+    history = [{"question": "what is memoization?", "answer": "caching subresults"}]
+    out = crag.ask(None, "u1", "how do I get better at dp?", history)
+
+    assert out["answer"] == "ok"
+    assert "what is memoization?" in seen["prompt"]
+    assert "caching subresults" in seen["prompt"]
+
+
 def test_good_retrieval_answers_in_one_pass(monkeypatch, scripted, llm, ollama):
     monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.1")
     scripted["batches"] = [[_chunk(i, f"passage {i}") for i in range(ENOUGH)]]

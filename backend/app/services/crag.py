@@ -44,6 +44,7 @@ class CragState(TypedDict, total=False):
     question: str
     query: str
     user_id: str
+    history: list[dict]
     hits: list[dict]
     web: list[dict]
     rounds: int
@@ -139,9 +140,18 @@ def _web(state: CragState) -> dict:
 
 
 def _context(state: CragState) -> str:
-    parts = [f"[{h['document']} #{h['ordinal']}] {h['text']}" for h in state.get("hits", [])]
+    parts = [
+        f"[{h['document']} p.{h['page']} #{h['ordinal']}] {h['text']}"
+        if h.get("page") else f"[{h['document']} #{h['ordinal']}] {h['text']}"
+        for h in state.get("hits", [])
+    ]
     parts += [f"[web: {w['url']}] {w['text']}" for w in state.get("web", [])]
     return "\n\n".join(parts)
+
+
+def _history(state: CragState) -> str:
+    turns = state.get("history") or []
+    return "\n\n".join(f"Q: {t['question']}\nA: {t['answer']}" for t in turns)
 
 
 def _generate(state: CragState) -> dict:
@@ -152,11 +162,13 @@ def _generate(state: CragState) -> dict:
     context = _context(state)
     if not context:
         return {"answer": None, "trace": state.get("trace", []) + ["generate: no context"]}
+    history = _history(state)
+    prior = f"Prior conversation:\n{history}\n\n" if history else ""
     try:
         answer = chat_model(0.3).invoke(
             "Answer the question using only the passages below. Be concrete and "
             "specific. If the passages don't cover something, say so rather than "
-            f"filling the gap.\n\nQuestion: {state['question']}\n\nPassages:\n{context}"
+            f"filling the gap.\n\n{prior}Question: {state['question']}\n\nPassages:\n{context}"
         ).content
     except Exception:
         log.exception("crag: generation failed; returning passages only")
@@ -221,10 +233,11 @@ def build_graph(db: Session):
     return g.compile()
 
 
-def ask(db: Session, user_id: str, question: str) -> dict:
+def ask(db: Session, user_id: str, question: str, history: list[dict] | None = None) -> dict:
     """Run the loop. Always returns passages; `answer` is None when no LLM is configured."""
     final = build_graph(db).invoke(
-        {"question": question, "user_id": user_id, "rounds": 0, "trace": []},
+        {"question": question, "user_id": user_id, "history": history or [],
+         "rounds": 0, "trace": []},
         {"recursion_limit": 25},
     )
     return {

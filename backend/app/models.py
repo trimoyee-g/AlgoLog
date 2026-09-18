@@ -88,6 +88,7 @@ class Chunk(Base):
     )
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     ordinal = Column(Integer, nullable=False)  # position within the document
+    page = Column(Integer, nullable=True)  # 1-indexed source page, None if unknown
     text = Column(Text, nullable=False)
     embedding = Column(Vector(settings.EMBEDDING_DIM), nullable=True)
 
