@@ -48,15 +48,17 @@ def test_a_bounced_address_does_not_starve_the_rest_of_the_loop(committing_db, s
     assert sent == ["other@example.com"]  # the user after the bounce still got theirs
 
 
-def test_a_failed_user_is_retried_on_a_rerun(committing_db, sent):
+def test_a_failed_send_keeps_its_claim_and_is_not_retried(committing_db, sent):
+    """A send failure means the SMTP ack may have been lost, not that nothing
+    went out — the claim stays so a rerun can't risk a duplicate."""
     sent.bounces.add("test@example.com")
     digest.run_weekly_digest(committing_db)
 
     sent.bounces.clear()  # transient outage cleared; operator reruns the job
     result = digest.run_weekly_digest(committing_db)
 
-    assert result["sent"] == 1 and result["skipped"] == 1
-    assert sent == ["other@example.com", "test@example.com"]
+    assert result["sent"] == 0 and result["skipped"] == 2
+    assert sent == ["other@example.com"]
 
 
 def test_claim_is_per_user_per_week(committing_db):
