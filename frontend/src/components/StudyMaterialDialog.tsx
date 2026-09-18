@@ -237,6 +237,7 @@ function AskAnswer({ result }: { result: AskResult }) {
                 </Badge>
                 <span className="truncate text-xs text-muted-foreground">
                   {p.document}
+                  {p.page != null && ` · p.${p.page}`}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">{p.text}</p>

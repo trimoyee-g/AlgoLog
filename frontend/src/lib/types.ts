@@ -98,6 +98,7 @@ export interface Passage {
   document_id: number;
   document: string;
   ordinal: number;
+  page: number | null;
   text: string;
   similarity: number;
   relevance: number;
