@@ -16,18 +16,17 @@ claude_desktop_config.json snippet).
 import os
 import time
 import asyncio
-from pathlib import Path
 from typing import Annotated
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
+from app import mcp_token_store
+
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
-
-_TOKEN_FILE = Path.home() / ".algolog" / "mcp_refresh_token"
 
 mcp = FastMCP("algolog")
 
@@ -36,22 +35,11 @@ _access_token: str | None = None
 _access_exp: float = 0.0
 
 
-def _load_refresh_token() -> str:
-    if _TOKEN_FILE.exists():
-        return _TOKEN_FILE.read_text().strip()
-    return os.environ.get("SUPABASE_REFRESH_TOKEN", "").strip()
-
-
-def _save_refresh_token(token: str) -> None:
-    _TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _TOKEN_FILE.write_text(token)
-
-
 async def _refresh() -> None:
     global _access_token, _access_exp
     if not SUPABASE_URL:
         raise RuntimeError("Set SUPABASE_URL to your Supabase project URL.")
-    refresh_token = _load_refresh_token()
+    refresh_token = mcp_token_store.load()
     if not refresh_token:
         raise RuntimeError(
             "No Supabase session for the MCP server. Run `python -m app.mcp_login` "
@@ -71,7 +59,7 @@ async def _refresh() -> None:
     _access_token = data["access_token"]
     _access_exp = data.get("expires_at", time.time() + 3600)
     if data.get("refresh_token"):  # rotated — persist for next restart
-        _save_refresh_token(data["refresh_token"])
+        mcp_token_store.save(data["refresh_token"])
 
 
 async def _access() -> str:
